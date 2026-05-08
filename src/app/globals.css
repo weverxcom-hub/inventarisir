@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-label,
+  #print-label * {
+    visibility: visible;
+  }
+  #print-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5cm;
+    height: 3cm;
+    padding: 2mm;
+    display: flex;
+    align-items: center;
+    gap: 2mm;
+    border: 1px solid #000;
+    box-sizing: border-box;
+  }
+  #print-label .label-qr {
+    width: 2.2cm;
+    height: 2.2cm;
+    flex-shrink: 0;
+  }
+  #print-label .label-qr img,
+  #print-label .label-qr canvas,
+  #print-label .label-qr svg {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  #print-label .label-info {
+    flex: 1;
+    min-width: 0;
+  }
+  #print-label .label-logo {
+    width: 1cm;
+    height: 1cm;
+    margin-bottom: 1mm;
+  }
+  #print-label .label-name {
+    font-size: 7pt;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  #print-label .label-id {
+    font-size: 6pt;
+    color: #333;
+    margin-top: 0.5mm;
+  }
+}
