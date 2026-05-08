@@ -1,6 +1,6 @@
-# UNIGA Inventory - Sistem Inventaris & Pengadaan
+# UNIGAMALANG Inventory - Sistem Inventaris & Pengadaan
 
-Sistem Manajemen Inventaris dan Pengadaan untuk **Universitas Gajayana Malang (UNIGA)**.
+Sistem Manajemen Inventaris dan Pengadaan untuk **Universitas Gajayana Malang (UNIGAMALANG)**.
 Menggunakan Google Sheets sebagai database dan Google Drive untuk penyimpanan file.
 
 ## Tech Stack
@@ -22,7 +22,7 @@ Menggunakan Google Sheets sebagai database dan Google Drive untuk penyimpanan fi
 
 ### Modul
 - **Dashboard**: Statistik inventaris & pengadaan
-- **Inventaris**: CRUD barang dengan auto-ID `UNIGA-INV-[YEAR]-[001]`
+- **Inventaris**: CRUD barang dengan auto-ID `UGMALANG-INV-[YEAR]-[001]`
 - **Pengadaan**: Form pengajuan + upload nota ke Google Drive
 - **Persetujuan**: Dashboard approval untuk Approver/Admin
 - **Pengguna**: Manajemen user (Admin only)
@@ -87,7 +87,7 @@ Karena belum ada user, tambahkan baris pertama di sheet **Users** secara manual:
 1. Buka Google Spreadsheet
 2. Di sheet **Users**, isi baris pertama:
    - Name: `Admin`
-   - Email: `admin@uniga.ac.id`
+   - Email: `admin@unigamalang.ac.id`
    - Password: *(hash bcrypt, generate di https://bcrypt-generator.com/)*
    - Role: `Admin`
 

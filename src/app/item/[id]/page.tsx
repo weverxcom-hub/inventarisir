@@ -185,7 +185,7 @@ export default function ItemDetailPage() {
                   fontWeight: 700,
                 }}
               >
-                UG
+                UGM
               </div>
             </div>
             <div className="label-name">{item.name}</div>

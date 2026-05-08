@@ -6,7 +6,7 @@ import Providers from "@/components/Providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "UNIGA Inventory - Sistem Inventaris & Pengadaan",
+  title: "UNIGAMALANG Inventory - Sistem Inventaris & Pengadaan",
   description:
     "Sistem Manajemen Inventaris dan Pengadaan Universitas Gajayana Malang",
 };

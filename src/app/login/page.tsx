@@ -37,10 +37,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-2xl font-bold text-blue-800 shadow-lg">
-            UG
+            UGM
           </div>
           <h1 className="text-2xl font-bold text-white">
-            Universitas Gajayana
+            Universitas Gajayana Malang
           </h1>
           <p className="mt-1 text-sm text-blue-200">
             Sistem Inventaris & Pengadaan
@@ -70,7 +70,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              placeholder="nama@uniga.ac.id"
+              placeholder="nama@unigamalang.ac.id"
               required
             />
           </div>

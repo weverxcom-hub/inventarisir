@@ -83,10 +83,10 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="flex items-center gap-3 border-b border-blue-700 px-6 py-5">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white font-bold text-blue-800 text-sm">
-            UG
+            UGM
           </div>
           <div>
-            <h1 className="text-sm font-bold leading-tight">UNIGA</h1>
+            <h1 className="text-sm font-bold leading-tight">UNIGAMALANG</h1>
             <p className="text-[11px] text-blue-200">Inventory System</p>
           </div>
         </div>

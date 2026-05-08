@@ -145,7 +145,7 @@ export async function generateItemId(): Promise<string> {
   const data = await getSheetData("Inventory");
   const rows = data.slice(1); // skip header
 
-  const yearPrefix = `UNIGA-INV-${year}-`;
+  const yearPrefix = `UGMALANG-INV-${year}-`;
   let maxNum = 0;
 
   for (const row of rows) {
