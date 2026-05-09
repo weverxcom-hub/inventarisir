@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import {
   Plus,
@@ -9,7 +9,19 @@ import {
   Upload,
   ExternalLink,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { ProcurementRequest, ProcurementStatus } from "@/types";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { apiFetch } from "@/lib/fetcher";
+
+const STATUS_FILTERS: Array<{ value: string; label: string }> = [
+  { value: "", label: "Semua" },
+  { value: "Pending", label: "Pending" },
+  { value: "Approved", label: "Approved" },
+  { value: "Rejected", label: "Rejected" },
+  { value: "Completed", label: "Completed" },
+];
 
 export default function ProcurementPage() {
   const { data: session } = useSession();
@@ -18,18 +30,22 @@ export default function ProcurementPage() {
 
   const [requests, setRequests] = useState<ProcurementRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [completing, setCompleting] = useState<string | null>(null);
+  const [completeTarget, setCompleteTarget] =
+    useState<ProcurementRequest | null>(null);
+  const [completing, setCompleting] = useState(false);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/procurement");
-      const data = await res.json();
+      const data = await apiFetch<{ requests: ProcurementRequest[] }>(
+        "/api/procurement"
+      );
       setRequests(data.requests || []);
     } catch {
-      // handle error
+      /* surfaced via toast */
     } finally {
       setLoading(false);
     }
@@ -39,19 +55,29 @@ export default function ProcurementPage() {
     fetchRequests();
   }, [fetchRequests]);
 
-  const handleComplete = async (requestId: string) => {
-    if (!confirm("Selesaikan pengadaan ini dan tambahkan ke inventaris?"))
-      return;
-    setCompleting(requestId);
+  const filtered = useMemo(() => {
+    if (!statusFilter) return requests;
+    return requests.filter((r) => r.status === statusFilter);
+  }, [requests, statusFilter]);
+
+  const confirmComplete = async () => {
+    if (!completeTarget) return;
+    setCompleting(true);
     try {
-      await fetch("/api/procurement", {
+      await apiFetch("/api/procurement", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: requestId, action: "complete" }),
+        body: JSON.stringify({
+          request_id: completeTarget.request_id,
+          action: "complete",
+        }),
+        successMessage: "Pengadaan diselesaikan & ditambahkan ke inventaris",
       });
+      setCompleteTarget(null);
       await fetchRequests();
+    } catch {
+      /* toast */
     } finally {
-      setCompleting(null);
+      setCompleting(false);
     }
   };
 
@@ -63,36 +89,31 @@ export default function ProcurementPage() {
   }) => {
     setSaving(true);
     try {
-      await fetch("/api/procurement", {
+      await apiFetch("/api/procurement", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
+        successMessage: "Permintaan pengadaan diajukan",
       });
       setShowForm(false);
       await fetchRequests();
+    } catch {
+      /* toast */
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat pengadaan...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner fullPage text="Memuat pengadaan..." />;
   }
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Pengadaan</h1>
           <p className="text-sm text-gray-500">
-            {requests.length} permintaan pengadaan
+            {filtered.length} dari {requests.length} permintaan
           </p>
         </div>
         <button
@@ -102,6 +123,22 @@ export default function ProcurementPage() {
           <Plus size={16} />
           Ajukan Pengadaan
         </button>
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-2">
+        {STATUS_FILTERS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setStatusFilter(opt.value)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              statusFilter === opt.value
+                ? "bg-blue-700 text-white"
+                : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -119,7 +156,7 @@ export default function ProcurementPage() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {requests.map((req) => (
+            {filtered.map((req) => (
               <tr key={req.request_id} className="hover:bg-gray-50">
                 <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-blue-600">
                   {req.request_id}
@@ -152,13 +189,9 @@ export default function ProcurementPage() {
                   <td className="px-4 py-3">
                     {req.status === "Approved" && (
                       <button
-                        onClick={() => handleComplete(req.request_id)}
-                        disabled={completing === req.request_id}
-                        className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                        onClick={() => setCompleteTarget(req)}
+                        className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700"
                       >
-                        {completing === req.request_id && (
-                          <Loader2 size={12} className="animate-spin" />
-                        )}
                         Selesaikan
                       </button>
                     )}
@@ -166,13 +199,15 @@ export default function ProcurementPage() {
                 )}
               </tr>
             ))}
-            {requests.length === 0 && (
+            {filtered.length === 0 && (
               <tr>
                 <td
                   colSpan={isAdmin ? 8 : 7}
-                  className="px-4 py-8 text-center text-gray-400"
+                  className="px-4 py-12 text-center text-gray-400"
                 >
-                  Belum ada permintaan pengadaan
+                  {requests.length === 0
+                    ? "Belum ada permintaan pengadaan"
+                    : "Tidak ada permintaan dengan status ini"}
                 </td>
               </tr>
             )}
@@ -187,6 +222,20 @@ export default function ProcurementPage() {
           onSubmit={handleSubmit}
         />
       )}
+
+      <ConfirmDialog
+        open={!!completeTarget}
+        title="Selesaikan pengadaan?"
+        description={
+          completeTarget
+            ? `Permintaan "${completeTarget.item_name}" akan ditandai selesai dan otomatis ditambahkan ke inventaris.`
+            : ""
+        }
+        confirmLabel="Selesaikan"
+        loading={completing}
+        onConfirm={confirmComplete}
+        onCancel={() => setCompleteTarget(null)}
+      />
     </div>
   );
 }
@@ -213,6 +262,7 @@ function ProcurementFormModal({
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
 
     setUploading(true);
@@ -225,11 +275,17 @@ function ProcurementFormModal({
         body: formData,
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Gagal mengupload file");
+      }
       if (data.fileId) {
         setNotaFileId(data.fileId);
+        toast.success("Nota berhasil diupload");
       }
-    } catch {
-      alert("Gagal mengupload file");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Gagal mengupload file"
+      );
     } finally {
       setUploading(false);
     }

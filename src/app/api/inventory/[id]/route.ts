@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSheetData } from "@/lib/google";
+import {
+  getSheetData,
+  updateRow,
+  deleteRow,
+  findRowIndex,
+} from "@/lib/google";
+import {
+  apiHandler,
+  notFound,
+  parseJson,
+  requireRoles,
+} from "@/lib/api";
+import { inventoryUpdateSchema } from "@/lib/validation";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
+export const GET = apiHandler(
+  async (_req: NextRequest, { params }: { params: { id: string } }) => {
     const data = await getSheetData("Inventory");
-    const rows = data.slice(1);
-
-    const row = rows.find((r) => r[0] === params.id);
-
-    if (!row) {
-      return NextResponse.json({ error: "Item not found" }, { status: 404 });
-    }
+    const row = data.slice(1).find((r) => r[0] === params.id);
+    if (!row) throw notFound("Item tidak ditemukan");
 
     const item = {
       item_id: row[0] || "",
@@ -29,11 +33,46 @@ export async function GET(
     };
 
     return NextResponse.json({ item });
-  } catch (error) {
-    console.error("Error fetching item:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch item" },
-      { status: 500 }
-    );
   }
-}
+);
+
+export const PUT = apiHandler(
+  async (req: NextRequest, { params }: { params: { id: string } }) => {
+    await requireRoles(["Admin"]);
+    const body = await parseJson(req, inventoryUpdateSchema);
+
+    const data = await getSheetData("Inventory");
+    const rowIndex = findRowIndex(data, 0, params.id);
+    if (rowIndex === -1) throw notFound("Item tidak ditemukan");
+
+    const existing = data[rowIndex - 1];
+
+    await updateRow("Inventory", rowIndex, [
+      params.id,
+      body.name ?? existing[1] ?? "",
+      body.category ?? existing[2] ?? "",
+      String(body.quantity ?? existing[3] ?? "0"),
+      body.location ?? existing[4] ?? "",
+      body.condition ?? existing[5] ?? "Good",
+      body.photo_url ?? existing[6] ?? "",
+      body.receipt_url ?? existing[7] ?? "",
+      existing[8] ?? "",
+      existing[9] ?? "",
+    ]);
+
+    return NextResponse.json({ success: true });
+  }
+);
+
+export const DELETE = apiHandler(
+  async (_req: NextRequest, { params }: { params: { id: string } }) => {
+    await requireRoles(["Admin"]);
+
+    const data = await getSheetData("Inventory");
+    const rowIndex = findRowIndex(data, 0, params.id);
+    if (rowIndex === -1) throw notFound("Item tidak ditemukan");
+
+    await deleteRow("Inventory", rowIndex);
+    return NextResponse.json({ success: true });
+  }
+);

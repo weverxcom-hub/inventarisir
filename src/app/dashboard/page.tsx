@@ -1,9 +1,16 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
-import { Package, ShoppingCart, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Package,
+  ShoppingCart,
+  CheckCircle,
+  AlertTriangle,
+} from "lucide-react";
 import type { InventoryItem, ProcurementRequest } from "@/types";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import { apiFetch } from "@/lib/fetcher";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -12,39 +19,46 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     async function fetchData() {
       try {
-        const [invRes, procRes] = await Promise.all([
-          fetch("/api/inventory"),
-          fetch("/api/procurement"),
+        const [invData, procData] = await Promise.all([
+          apiFetch<{ items: InventoryItem[] }>("/api/inventory", {
+            notifyOnError: false,
+          }),
+          apiFetch<{ requests: ProcurementRequest[] }>("/api/procurement", {
+            notifyOnError: false,
+          }),
         ]);
-        const invData = await invRes.json();
-        const procData = await procRes.json();
+        if (cancelled) return;
         setInventory(invData.items || []);
         setProcurement(procData.requests || []);
       } catch {
-        // silently handle
+        /* errors are surfaced via apiFetch toasts in callers that opt in */
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const totalItems = inventory.length;
-  const goodItems = inventory.filter((i) => i.condition === "Good").length;
-  const needRepair = inventory.filter((i) => i.condition === "Repair").length;
-  const pendingRequests = procurement.filter((p) => p.status === "Pending").length;
+  const stats = useMemo(() => {
+    const totalItems = inventory.length;
+    const goodItems = inventory.filter((i) => i.condition === "Good").length;
+    const needRepair = inventory.filter(
+      (i) => i.condition === "Repair"
+    ).length;
+    const pendingRequests = procurement.filter(
+      (p) => p.status === "Pending"
+    ).length;
+    return { totalItems, goodItems, needRepair, pendingRequests };
+  }, [inventory, procurement]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat dashboard...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner fullPage text="Memuat dashboard..." />;
   }
 
   return (
@@ -60,25 +74,25 @@ export default function DashboardPage() {
         <StatCard
           icon={<Package className="h-6 w-6 text-blue-600" />}
           label="Total Inventaris"
-          value={totalItems}
+          value={stats.totalItems}
           color="blue"
         />
         <StatCard
           icon={<CheckCircle className="h-6 w-6 text-green-600" />}
           label="Kondisi Baik"
-          value={goodItems}
+          value={stats.goodItems}
           color="green"
         />
         <StatCard
           icon={<AlertTriangle className="h-6 w-6 text-yellow-600" />}
           label="Perlu Perbaikan"
-          value={needRepair}
+          value={stats.needRepair}
           color="yellow"
         />
         <StatCard
           icon={<ShoppingCart className="h-6 w-6 text-purple-600" />}
           label="Pengadaan Menunggu"
-          value={pendingRequests}
+          value={stats.pendingRequests}
           color="purple"
         />
       </div>

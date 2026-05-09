@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
@@ -11,8 +11,69 @@ import {
   Eye,
   Loader2,
   X,
+  Upload,
+  Download,
+  Filter,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { InventoryItem, ItemCondition } from "@/types";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { apiFetch } from "@/lib/fetcher";
+
+const CONDITION_LABEL: Record<ItemCondition | string, string> = {
+  Good: "Baik",
+  Repair: "Perlu Perbaikan",
+  Broken: "Rusak",
+};
+
+function escapeCsv(value: string): string {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function downloadCsv(items: InventoryItem[]): void {
+  const headers = [
+    "Item ID",
+    "Nama",
+    "Kategori",
+    "Jumlah",
+    "Lokasi",
+    "Kondisi",
+    "Foto",
+    "Nota",
+    "Tanggal Dibuat",
+  ];
+  const rows = items.map((item) => [
+    item.item_id,
+    item.name,
+    item.category,
+    String(item.quantity),
+    item.location,
+    item.condition,
+    item.photo_url,
+    item.receipt_url,
+    item.created_at,
+  ]);
+  const csv =
+    [headers, ...rows]
+      .map((row) => row.map((cell) => escapeCsv(cell ?? "")).join(","))
+      .join("\n") + "\n";
+
+  const blob = new Blob(["\uFEFF" + csv], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `inventaris-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export default function InventoryPage() {
   const { data: session } = useSession();
@@ -22,19 +83,21 @@ export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [conditionFilter, setConditionFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/inventory");
-      const data = await res.json();
+      const data = await apiFetch<{ items: InventoryItem[] }>("/api/inventory");
       setItems(data.items || []);
     } catch {
-      // handle error
+      /* surfaced via toast */
     } finally {
       setLoading(false);
     }
@@ -44,21 +107,46 @@ export default function InventoryPage() {
     fetchItems();
   }, [fetchItems]);
 
-  const filtered = items.filter(
-    (item) =>
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.item_id.toLowerCase().includes(search.toLowerCase()) ||
-      item.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((it) => {
+      if (it.category) set.add(it.category);
+    });
+    return Array.from(set).sort();
+  }, [items]);
 
-  const handleDelete = async (itemId: string) => {
-    if (!confirm("Hapus item ini?")) return;
-    setDeleting(itemId);
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return items.filter((item) => {
+      if (
+        needle &&
+        !item.name.toLowerCase().includes(needle) &&
+        !item.item_id.toLowerCase().includes(needle) &&
+        !item.category.toLowerCase().includes(needle) &&
+        !item.location.toLowerCase().includes(needle)
+      ) {
+        return false;
+      }
+      if (categoryFilter && item.category !== categoryFilter) return false;
+      if (conditionFilter && item.condition !== conditionFilter) return false;
+      return true;
+    });
+  }, [items, search, categoryFilter, conditionFilter]);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await fetch(`/api/inventory?item_id=${itemId}`, { method: "DELETE" });
+      await apiFetch(`/api/inventory/${encodeURIComponent(deleteTarget.item_id)}`, {
+        method: "DELETE",
+        successMessage: "Item dihapus",
+      });
+      setDeleteTarget(null);
       await fetchItems();
+    } catch {
+      /* toast already shown */
     } finally {
-      setDeleting(null);
+      setDeleting(false);
     }
   };
 
@@ -68,59 +156,60 @@ export default function InventoryPage() {
     quantity: number;
     location: string;
     condition: ItemCondition;
+    photo_url: string;
+    receipt_url: string;
   }) => {
     setSaving(true);
     try {
       if (editItem) {
-        await fetch("/api/inventory", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ item_id: editItem.item_id, ...formData }),
-        });
+        await apiFetch(
+          `/api/inventory/${encodeURIComponent(editItem.item_id)}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(formData),
+            successMessage: "Item diperbarui",
+          }
+        );
       } else {
-        await fetch("/api/inventory", {
+        await apiFetch("/api/inventory", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
+          successMessage: "Item ditambahkan",
         });
       }
       setShowForm(false);
       setEditItem(null);
       await fetchItems();
+    } catch {
+      /* toast already shown */
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat inventaris...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner fullPage text="Memuat inventaris..." />;
   }
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Inventaris</h1>
-          <p className="text-sm text-gray-500">{items.length} item tercatat</p>
+          <p className="text-sm text-gray-500">
+            {filtered.length} dari {items.length} item ditampilkan
+          </p>
         </div>
-        <div className="flex gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Cari item..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="rounded-lg border border-gray-300 py-2 pl-9 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => downloadCsv(filtered)}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+            title="Unduh sebagai CSV"
+          >
+            <Download size={16} />
+            Export CSV
+          </button>
           {isAdmin && (
             <button
               onClick={() => {
@@ -134,6 +223,45 @@ export default function InventoryPage() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-6 flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Cari nama, ID, kategori, lokasi..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          />
+        </div>
+        <div className="relative">
+          <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="rounded-lg border border-gray-300 py-2 pl-9 pr-8 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            <option value="">Semua Kategori</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+        <select
+          value={conditionFilter}
+          onChange={(e) => setConditionFilter(e.target.value)}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        >
+          <option value="">Semua Kondisi</option>
+          <option value="Good">Baik</option>
+          <option value="Repair">Perlu Perbaikan</option>
+          <option value="Broken">Rusak</option>
+        </select>
       </div>
 
       {/* Table */}
@@ -185,16 +313,11 @@ export default function InventoryPage() {
                           <Pencil size={16} />
                         </button>
                         <button
-                          onClick={() => handleDelete(item.item_id)}
-                          disabled={deleting === item.item_id}
-                          className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600 disabled:opacity-50"
+                          onClick={() => setDeleteTarget(item)}
+                          className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600"
                           title="Hapus"
                         >
-                          {deleting === item.item_id ? (
-                            <Loader2 size={16} className="animate-spin" />
-                          ) : (
-                            <Trash2 size={16} />
-                          )}
+                          <Trash2 size={16} />
                         </button>
                       </>
                     )}
@@ -206,9 +329,11 @@ export default function InventoryPage() {
               <tr>
                 <td
                   colSpan={7}
-                  className="px-4 py-8 text-center text-gray-400"
+                  className="px-4 py-12 text-center text-gray-400"
                 >
-                  {search ? "Tidak ada item yang cocok" : "Belum ada data inventaris"}
+                  {items.length === 0
+                    ? "Belum ada data inventaris. Klik 'Tambah Item' untuk mulai."
+                    : "Tidak ada item yang cocok dengan filter."}
                 </td>
               </tr>
             )}
@@ -228,8 +353,33 @@ export default function InventoryPage() {
           onSubmit={handleSubmit}
         />
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Hapus item ini?"
+        description={
+          deleteTarget
+            ? `Item "${deleteTarget.name}" (${deleteTarget.item_id}) akan dihapus permanen dari inventaris.`
+            : ""
+        }
+        destructive
+        confirmLabel="Hapus"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
+}
+
+interface ItemFormSubmit {
+  name: string;
+  category: string;
+  quantity: number;
+  location: string;
+  condition: ItemCondition;
+  photo_url: string;
+  receipt_url: string;
 }
 
 function ItemFormModal({
@@ -241,13 +391,7 @@ function ItemFormModal({
   item: InventoryItem | null;
   saving: boolean;
   onClose: () => void;
-  onSubmit: (data: {
-    name: string;
-    category: string;
-    quantity: number;
-    location: string;
-    condition: ItemCondition;
-  }) => void;
+  onSubmit: (data: ItemFormSubmit) => void;
 }) {
   const [name, setName] = useState(item?.name || "");
   const [category, setCategory] = useState(item?.category || "");
@@ -256,10 +400,44 @@ function ItemFormModal({
   const [condition, setCondition] = useState<ItemCondition>(
     item?.condition || "Good"
   );
+  const [photoUrl, setPhotoUrl] = useState(item?.photo_url || "");
+  const [receiptUrl, setReceiptUrl] = useState(item?.receipt_url || "");
+  const [uploadingField, setUploadingField] = useState<
+    "photo" | "receipt" | null
+  >(null);
+
+  const upload = async (
+    field: "photo" | "receipt",
+    file: File
+  ): Promise<void> => {
+    setUploadingField(field);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Gagal mengupload file");
+      }
+      const link = data.webViewLink || "";
+      if (field === "photo") setPhotoUrl(link);
+      else setReceiptUrl(link);
+      toast.success("File berhasil diupload");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Gagal mengupload file"
+      );
+    } finally {
+      setUploadingField(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">
             {item ? "Edit Item" : "Tambah Item Baru"}
@@ -272,7 +450,15 @@ function ItemFormModal({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            onSubmit({ name, category, quantity, location, condition });
+            onSubmit({
+              name: name.trim(),
+              category: category.trim(),
+              quantity,
+              location: location.trim(),
+              condition,
+              photo_url: photoUrl,
+              receipt_url: receiptUrl,
+            });
           }}
           className="space-y-4"
         >
@@ -339,12 +525,32 @@ function ItemFormModal({
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
-                <option value="Good">Baik</option>
-                <option value="Repair">Perlu Perbaikan</option>
-                <option value="Broken">Rusak</option>
+                {(["Good", "Repair", "Broken"] as const).map((c) => (
+                  <option key={c} value={c}>
+                    {CONDITION_LABEL[c]}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
+
+          <UploadField
+            label="Foto Item"
+            url={photoUrl}
+            uploading={uploadingField === "photo"}
+            disabled={!!uploadingField}
+            onChange={(file) => upload("photo", file)}
+            onClear={() => setPhotoUrl("")}
+          />
+
+          <UploadField
+            label="Foto Nota Pembelian"
+            url={receiptUrl}
+            uploading={uploadingField === "receipt"}
+            disabled={!!uploadingField}
+            onChange={(file) => upload("receipt", file)}
+            onClear={() => setReceiptUrl("")}
+          />
 
           <div className="flex justify-end gap-3 pt-2">
             <button
@@ -356,7 +562,7 @@ function ItemFormModal({
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !!uploadingField}
               className="flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
             >
               {saving && <Loader2 size={14} className="animate-spin" />}
@@ -364,6 +570,72 @@ function ItemFormModal({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function UploadField({
+  label,
+  url,
+  uploading,
+  disabled,
+  onChange,
+  onClear,
+}: {
+  label: string;
+  url: string;
+  uploading: boolean;
+  disabled: boolean;
+  onChange: (file: File) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-gray-700">
+        {label}{" "}
+        <span className="text-xs font-normal text-gray-400">(opsional)</span>
+      </label>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+          {uploading ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Upload size={16} />
+          )}
+          {uploading ? "Mengupload..." : "Pilih File"}
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            disabled={disabled}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onChange(file);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {url && (
+          <div className="flex items-center gap-2 text-xs">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              Lihat file
+            </a>
+            <button
+              type="button"
+              onClick={onClear}
+              className="text-gray-400 hover:text-red-600"
+              title="Hapus"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -382,7 +654,7 @@ function ConditionBadge({ condition }: { condition: string }) {
         styles[condition] || "bg-gray-100 text-gray-700"
       }`}
     >
-      {condition}
+      {CONDITION_LABEL[condition] || condition}
     </span>
   );
 }

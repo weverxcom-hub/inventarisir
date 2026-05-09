@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Loader2, LogIn } from "lucide-react";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,7 +19,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const res = await signIn("credentials", {
-      email,
+      email: email.trim(),
       password,
       redirect: false,
     });
@@ -26,10 +27,14 @@ export default function LoginPage() {
     setLoading(false);
 
     if (res?.error) {
-      setError("Email atau password salah");
-    } else {
-      router.push("/dashboard");
+      const message = "Email atau password salah";
+      setError(message);
+      toast.error(message);
+      return;
     }
+
+    toast.success("Berhasil masuk");
+    router.push("/dashboard");
   };
 
   return (

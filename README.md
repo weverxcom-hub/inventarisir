@@ -7,9 +7,11 @@ Menggunakan Google Sheets sebagai database dan Google Drive untuk penyimpanan fi
 
 - **Frontend**: Next.js 14 (App Router), Tailwind CSS, Lucide Icons
 - **Auth**: NextAuth.js (Credentials Provider, JWT strategy)
-- **Database**: Google Sheets API v4
+- **Database**: Google Sheets API v4 (dengan auth client di-cache)
 - **Storage**: Google Drive API v3
-- **QR Code**: qrcode + qrcode.react
+- **Validation**: Zod (validasi runtime di setiap endpoint)
+- **Notifications**: Sonner (toast)
+- **QR Code**: qrcode.react (di-render client-side dari URL kanonik)
 
 ## Fitur
 
@@ -22,12 +24,25 @@ Menggunakan Google Sheets sebagai database dan Google Drive untuk penyimpanan fi
 
 ### Modul
 - **Dashboard**: Statistik inventaris & pengadaan
-- **Inventaris**: CRUD barang dengan auto-ID `UGMALANG-INV-[YEAR]-[001]`
-- **Pengadaan**: Form pengajuan + upload nota ke Google Drive
+- **Inventaris**: CRUD barang dengan auto-ID `UGMALANG-INV-[YEAR]-[001]`,
+  filter per **Kategori** & **Kondisi**, **Export CSV**, dan upload **foto
+  item / nota pembelian** ke Google Drive
+- **Pengadaan**: Form pengajuan + upload nota ke Google Drive, filter per
+  **status** (Pending / Approved / Rejected / Completed)
 - **Persetujuan**: Dashboard approval untuk Approver/Admin
 - **Pengguna**: Manajemen user (Admin only)
-- **Detail Item**: Halaman publik untuk scan QR code
+- **Detail Item**: Halaman publik untuk scan QR code (QR di-render
+  client-side dari URL — tidak menyimpan DataURL di Sheet)
 - **Print Label**: Cetak stiker 5cm x 3cm (Logo + Nama + ID + QR)
+
+### Optimasi
+- Auth Google API di-cache pada level modul (tidak parse JSON tiap request)
+- Validasi Zod terpadu di semua endpoint POST/PUT
+- Wrapper `apiHandler()` + `requireRoles()` untuk error handling konsisten
+- Toast notifikasi (Sonner) menggantikan `alert()` & silent catches
+- Endpoint REST konsisten: `/api/inventory/[id]`, `/api/users/[email]`
+- Validasi env vars saat dibutuhkan (lazy)
+- Pembatasan upload: 10 MB, hanya gambar / PDF
 
 ## Setup
 
@@ -82,14 +97,27 @@ GOOGLE_DRIVE_FOLDER_ID=<ID folder Drive>
 
 ### 5. Buat User Admin Pertama
 
-Karena belum ada user, tambahkan baris pertama di sheet **Users** secara manual:
+Setelah aplikasi berjalan, gunakan endpoint **`POST /api/bootstrap`** untuk
+membuat akun admin pertama (hanya berfungsi saat sheet `Users` masih kosong):
 
-1. Buka Google Spreadsheet
-2. Di sheet **Users**, isi baris pertama:
-   - Name: `Admin`
-   - Email: `admin@unigamalang.ac.id`
-   - Password: *(hash bcrypt, generate di https://bcrypt-generator.com/)*
-   - Role: `Admin`
+```bash
+curl -X POST http://localhost:3000/api/bootstrap \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Admin",
+    "email": "admin@unigamalang.ac.id",
+    "password": "rahasia-yang-kuat"
+  }'
+```
+
+Atau cek terlebih dahulu apakah bootstrap masih dibutuhkan:
+
+```bash
+curl http://localhost:3000/api/bootstrap
+```
+
+> Setelah ada minimal satu user, endpoint ini akan menolak permintaan baru
+> demi keamanan. Tambahkan user tambahan lewat menu **Pengguna** di dashboard.
 
 ### 6. Jalankan Aplikasi
 
@@ -107,25 +135,29 @@ src/
 ├── app/
 │   ├── api/
 │   │   ├── auth/[...nextauth]/   # NextAuth handler
-│   │   ├── inventory/            # CRUD inventaris
+│   │   ├── bootstrap/            # Seed admin pertama
+│   │   ├── inventory/            # GET / POST  (collection)
+│   │   │   └── [id]/             # GET / PUT / DELETE (resource)
 │   │   ├── procurement/          # CRUD pengadaan
-│   │   ├── upload/               # Upload file ke Drive
-│   │   └── users/                # CRUD pengguna
-│   ├── dashboard/
-│   │   ├── inventory/            # Halaman inventaris
-│   │   ├── procurement/          # Halaman pengadaan
-│   │   ├── approvals/            # Halaman persetujuan
-│   │   └── users/                # Halaman kelola user
-│   ├── item/[id]/                # Detail item (public)
+│   │   ├── upload/               # Upload file ke Drive (10 MB, image/PDF)
+│   │   └── users/                # GET / POST  (collection)
+│   │       └── [email]/          # PUT / DELETE (resource)
+│   ├── dashboard/                # Halaman inventaris/pengadaan/dll.
+│   ├── item/[id]/                # Detail item (public, QR client-side)
 │   └── login/                    # Halaman login
 ├── components/
+│   ├── ConfirmDialog.tsx         # Reusable confirm dialog
 │   ├── LoadingSpinner.tsx
-│   ├── Providers.tsx
+│   ├── Providers.tsx             # SessionProvider + Toaster
 │   └── Sidebar.tsx
 ├── lib/
+│   ├── api.ts                    # apiHandler / requireRoles / parseJson
 │   ├── auth.ts                   # NextAuth config
-│   ├── google.ts                 # Google Sheets/Drive helpers
-│   └── session.ts                # Server-side session helpers
+│   ├── env.ts                    # Validasi env vars (lazy)
+│   ├── fetcher.ts                # apiFetch dengan toast error
+│   ├── google.ts                 # Google Sheets/Drive helpers (cached)
+│   ├── session.ts                # Server-side session helpers
+│   └── validation.ts             # Skema Zod
 ├── types/
 │   ├── index.ts                  # Type definitions
 │   └── next-auth.d.ts            # NextAuth type augmentation
