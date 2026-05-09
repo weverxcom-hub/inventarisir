@@ -14,30 +14,37 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const email = credentials.email.trim().toLowerCase();
-        const data = await getSheetData("Users");
-        const rows = data.slice(1);
+        // Wrap everything so a backend / Sheets failure surfaces as a normal
+        // sign-in failure instead of NextAuth's cryptic "Server error" page.
+        try {
+          const email = credentials.email.trim().toLowerCase();
+          const data = await getSheetData("Users");
+          const rows = data.slice(1);
 
-        const userRow = rows.find(
-          (row) => (row[1] || "").trim().toLowerCase() === email
-        );
-        if (!userRow) return null;
+          const userRow = rows.find(
+            (row) => (row[1] || "").trim().toLowerCase() === email
+          );
+          if (!userRow) return null;
 
-        const [name, storedEmail, hashedPassword, role] = userRow;
-        if (!hashedPassword) return null;
+          const [name, storedEmail, hashedPassword, role] = userRow;
+          if (!hashedPassword) return null;
 
-        const isValid = await bcrypt.compare(
-          credentials.password,
-          hashedPassword
-        );
-        if (!isValid) return null;
+          const isValid = await bcrypt.compare(
+            credentials.password,
+            hashedPassword
+          );
+          if (!isValid) return null;
 
-        return {
-          id: storedEmail,
-          name,
-          email: storedEmail,
-          role,
-        };
+          return {
+            id: storedEmail,
+            name,
+            email: storedEmail,
+            role,
+          };
+        } catch (err) {
+          console.error("[auth.authorize] failed:", err);
+          return null;
+        }
       },
     }),
   ],

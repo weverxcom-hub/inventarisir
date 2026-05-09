@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { InventoryItem } from "@/types";
+import Logo from "@/components/Logo";
+import Footer from "@/components/Footer";
 
 export default function ItemDetailPage() {
   const params = useParams();
@@ -86,8 +88,21 @@ export default function ItemDetailPage() {
   const cond = conditionStyles[item.condition] || conditionStyles.Good;
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="mx-auto max-w-2xl">
+    <div className="flex min-h-screen flex-col bg-gray-50 px-4 py-8">
+      <div className="mx-auto w-full max-w-2xl flex-1">
+        {/* Brand header */}
+        <div className="mb-6 flex items-center justify-center gap-3">
+          <Logo size={36} />
+          <div className="text-center">
+            <p className="text-sm font-bold text-blue-800">
+              Universitas Gajayana Malang
+            </p>
+            <p className="text-[11px] text-gray-500">
+              Sistem Inventaris &amp; Pengadaan
+            </p>
+          </div>
+        </div>
+
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <Link
@@ -171,28 +186,19 @@ export default function ItemDetailPage() {
           </div>
           <div className="label-info">
             <div className="label-logo">
-              <div
-                style={{
-                  width: "1cm",
-                  height: "1cm",
-                  background: "#1d4ed8",
-                  borderRadius: "4px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  fontSize: "6pt",
-                  fontWeight: 700,
-                }}
-              >
-                UGM
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo-uniga.svg"
+                alt="UNIGA"
+                style={{ width: "1cm", height: "1cm" }}
+              />
             </div>
             <div className="label-name">{item.name}</div>
             <div className="label-id">{item.item_id}</div>
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

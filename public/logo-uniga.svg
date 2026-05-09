@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Logo Universitas Gajayana Malang">
+  <defs>
+    <linearGradient id="ugBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e40af"/>
+      <stop offset="100%" stop-color="#0c1d6b"/>
+    </linearGradient>
+    <linearGradient id="ugRibbon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer ring -->
+  <circle cx="60" cy="60" r="56" fill="url(#ugBg)" stroke="#fbbf24" stroke-width="3"/>
+  <circle cx="60" cy="60" r="48" fill="none" stroke="#fbbf24" stroke-width="1" opacity="0.6"/>
+
+  <!-- Open book -->
+  <g transform="translate(60 70)">
+    <path d="M -28 0 Q -14 -8 0 -4 Q 14 -8 28 0 L 28 14 Q 14 6 0 10 Q -14 6 -28 14 Z"
+          fill="#ffffff" stroke="#fbbf24" stroke-width="1.5"/>
+    <line x1="0" y1="-4" x2="0" y2="10" stroke="#0c1d6b" stroke-width="1.2"/>
+    <line x1="-20" y1="-2" x2="-6" y2="-1" stroke="#0c1d6b" stroke-width="0.6"/>
+    <line x1="-20" y1="2" x2="-6" y2="3" stroke="#0c1d6b" stroke-width="0.6"/>
+    <line x1="6" y1="-1" x2="20" y2="-2" stroke="#0c1d6b" stroke-width="0.6"/>
+    <line x1="6" y1="3" x2="20" y2="2" stroke="#0c1d6b" stroke-width="0.6"/>
+  </g>
+
+  <!-- Torch / flame above book -->
+  <g transform="translate(60 36)">
+    <path d="M 0 -16 C 6 -10 6 -4 0 4 C -6 -4 -6 -10 0 -16 Z"
+          fill="#fbbf24" stroke="#d97706" stroke-width="1"/>
+    <rect x="-2" y="4" width="4" height="14" fill="#fbbf24" stroke="#d97706" stroke-width="0.8"/>
+    <rect x="-6" y="18" width="12" height="3" rx="1" fill="#fbbf24" stroke="#d97706" stroke-width="0.8"/>
+  </g>
+
+  <!-- "UNIGA" text -->
+  <text x="60" y="105" text-anchor="middle"
+        font-family="Inter, system-ui, sans-serif"
+        font-size="11" font-weight="700"
+        fill="#fbbf24" letter-spacing="2">UNIGA</text>
+</svg>

@@ -5,6 +5,8 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Loader2, LogIn } from "lucide-react";
 import { toast } from "sonner";
+import Logo from "@/components/Logo";
+import Footer from "@/components/Footer";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,17 +40,17 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 px-4">
-      <div className="w-full max-w-md">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 px-4 py-10">
+      <div className="w-full max-w-md flex-1 flex flex-col justify-center">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-2xl font-bold text-blue-800 shadow-lg">
-            UGM
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-white p-2 shadow-lg">
+            <Logo size={64} priority />
           </div>
           <h1 className="text-2xl font-bold text-white">
             Universitas Gajayana Malang
           </h1>
           <p className="mt-1 text-sm text-blue-200">
-            Sistem Inventaris & Pengadaan
+            Sistem Inventaris &amp; Pengadaan
           </p>
         </div>
 
@@ -111,6 +113,10 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-xs text-blue-300">
           &copy; {new Date().getFullYear()} Universitas Gajayana Malang
         </p>
+      </div>
+
+      <div className="w-full max-w-md">
+        <Footer variant="dark" />
       </div>
     </div>
   );
