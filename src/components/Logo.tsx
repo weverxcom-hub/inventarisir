@@ -7,8 +7,8 @@ interface LogoProps {
 }
 
 /**
- * UNIGA Malang logo. Sourced from /public/logo-uniga.svg so it's cacheable and
- * resolution-independent.
+ * Official Universitas Gajayana Malang logo.
+ * Source: https://upload.wikimedia.org/wikipedia/id/5/5e/LOGO-UNIGA.png
  */
 export default function Logo({
   size = 40,
@@ -17,7 +17,7 @@ export default function Logo({
 }: LogoProps) {
   return (
     <Image
-      src="/logo-uniga.svg"
+      src="/logo-uniga.png"
       alt="Logo Universitas Gajayana Malang"
       width={size}
       height={size}

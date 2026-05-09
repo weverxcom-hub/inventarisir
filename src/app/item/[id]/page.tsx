@@ -188,7 +188,7 @@ export default function ItemDetailPage() {
             <div className="label-logo">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/logo-uniga.svg"
+                src="/logo-uniga.png"
                 alt="UNIGA"
                 style={{ width: "1cm", height: "1cm" }}
               />
