@@ -14,13 +14,18 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
+        const email = credentials.email.trim().toLowerCase();
         const data = await getSheetData("Users");
-        const rows = data.slice(1); // skip header
+        const rows = data.slice(1);
 
-        const userRow = rows.find((row) => row[1] === credentials.email);
+        const userRow = rows.find(
+          (row) => (row[1] || "").trim().toLowerCase() === email
+        );
         if (!userRow) return null;
 
-        const [name, email, hashedPassword, role] = userRow;
+        const [name, storedEmail, hashedPassword, role] = userRow;
+        if (!hashedPassword) return null;
+
         const isValid = await bcrypt.compare(
           credentials.password,
           hashedPassword
@@ -28,9 +33,9 @@ export const authOptions: NextAuthOptions = {
         if (!isValid) return null;
 
         return {
-          id: email,
+          id: storedEmail,
           name,
-          email,
+          email: storedEmail,
           role,
         };
       },
@@ -39,13 +44,13 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as { role: string }).role;
+        token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as { role?: string }).role = token.role as string;
+        session.user.role = token.role;
       }
       return session;
     },

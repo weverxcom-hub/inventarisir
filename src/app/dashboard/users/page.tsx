@@ -9,6 +9,9 @@ import {
   X,
 } from "lucide-react";
 import type { UserRole } from "@/types";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { apiFetch } from "@/lib/fetcher";
 
 interface UserData {
   name: string;
@@ -22,16 +25,16 @@ export default function UsersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState<UserData | null>(null);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserData | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/users");
-      const data = await res.json();
+      const data = await apiFetch<{ users: UserData[] }>("/api/users");
       setUsers(data.users || []);
     } catch {
-      // handle error
+      /* surfaced via toast */
     } finally {
       setLoading(false);
     }
@@ -41,16 +44,23 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  const handleDelete = async (email: string) => {
-    if (!confirm("Hapus pengguna ini?")) return;
-    setDeleting(email);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await fetch(`/api/users?email=${encodeURIComponent(email)}`, {
-        method: "DELETE",
-      });
+      await apiFetch(
+        `/api/users/${encodeURIComponent(deleteTarget.email)}`,
+        {
+          method: "DELETE",
+          successMessage: "Pengguna dihapus",
+        }
+      );
+      setDeleteTarget(null);
       await fetchUsers();
+    } catch {
+      /* toast */
     } finally {
-      setDeleting(null);
+      setDeleting(false);
     }
   };
 
@@ -64,42 +74,38 @@ export default function UsersPage() {
     try {
       if (editUser) {
         const body: Record<string, string> = {
-          email: formData.email,
           name: formData.name,
           role: formData.role,
         };
-        if (formData.password) {
-          body.password = formData.password;
-        }
-        await fetch("/api/users", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
+        if (formData.password) body.password = formData.password;
+
+        await apiFetch(
+          `/api/users/${encodeURIComponent(editUser.email)}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(body),
+            successMessage: "Pengguna diperbarui",
+          }
+        );
       } else {
-        await fetch("/api/users", {
+        await apiFetch("/api/users", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
+          successMessage: "Pengguna ditambahkan",
         });
       }
       setShowForm(false);
       setEditUser(null);
       await fetchUsers();
+    } catch {
+      /* toast */
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat pengguna...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner fullPage text="Memuat pengguna..." />;
   }
 
   return (
@@ -152,16 +158,11 @@ export default function UsersPage() {
                       <Pencil size={16} />
                     </button>
                     <button
-                      onClick={() => handleDelete(user.email)}
-                      disabled={deleting === user.email}
-                      className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600 disabled:opacity-50"
+                      onClick={() => setDeleteTarget(user)}
+                      className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600"
                       title="Hapus"
                     >
-                      {deleting === user.email ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </td>
@@ -192,6 +193,21 @@ export default function UsersPage() {
           onSubmit={handleSubmit}
         />
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Hapus pengguna ini?"
+        description={
+          deleteTarget
+            ? `${deleteTarget.name} (${deleteTarget.email}) akan kehilangan akses ke sistem.`
+            : ""
+        }
+        destructive
+        confirmLabel="Hapus"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

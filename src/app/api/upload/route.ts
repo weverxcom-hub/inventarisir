@@ -1,30 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadFileToDrive } from "@/lib/google";
-import { requireAuth } from "@/lib/session";
+import { apiHandler, badRequest, requireSession } from "@/lib/api";
 
-export async function POST(req: NextRequest) {
-  try {
-    await requireAuth();
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_MIME_PREFIXES = ["image/", "application/pdf"];
 
-    const formData = await req.formData();
-    const file = formData.get("file") as File | null;
+export const POST = apiHandler(async (req: NextRequest) => {
+  await requireSession();
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
+  const formData = await req.formData();
+  const file = formData.get("file") as File | null;
+  if (!file) throw badRequest("File tidak ditemukan");
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await uploadFileToDrive(file.name, file.type, buffer);
-
-    return NextResponse.json({
-      success: true,
-      fileId: result.fileId,
-      webViewLink: result.webViewLink,
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to upload file";
-    const status = message === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ error: message }, { status });
+  if (file.size > MAX_FILE_SIZE) {
+    throw badRequest("Ukuran file maksimal 10 MB");
   }
-}
+
+  const allowed = ALLOWED_MIME_PREFIXES.some((p) =>
+    (file.type || "").startsWith(p)
+  );
+  if (!allowed) {
+    throw badRequest("Tipe file tidak didukung (gunakan gambar atau PDF)");
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const result = await uploadFileToDrive(file.name, file.type, buffer);
+
+  return NextResponse.json({
+    success: true,
+    fileId: result.fileId,
+    webViewLink: result.webViewLink,
+  });
+});

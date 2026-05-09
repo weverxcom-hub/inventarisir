@@ -76,12 +76,12 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-full w-64 transform bg-blue-800 text-white transition-transform duration-200 ease-in-out md:translate-x-0 ${
+        className={`fixed top-0 left-0 z-40 flex h-full w-64 transform flex-col bg-blue-800 text-white transition-transform duration-200 ease-in-out md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 border-b border-blue-700 px-6 py-5">
+        <div className="flex shrink-0 items-center gap-3 border-b border-blue-700 px-6 py-5">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white font-bold text-blue-800 text-sm">
             UGM
           </div>
@@ -92,7 +92,7 @@ export default function Sidebar() {
         </div>
 
         {/* Nav */}
-        <nav className="mt-4 flex flex-col gap-1 px-3">
+        <nav className="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto px-3">
           {filtered.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -116,7 +116,7 @@ export default function Sidebar() {
         </nav>
 
         {/* User info & logout */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-blue-700 p-4">
+        <div className="shrink-0 border-t border-blue-700 p-4">
           <div className="mb-3 text-xs">
             <p className="font-medium text-white truncate">
               {session?.user?.name || "User"}

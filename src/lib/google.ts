@@ -1,49 +1,68 @@
-import { google } from "googleapis";
+import { google, sheets_v4, drive_v3 } from "googleapis";
+import type { GoogleAuth } from "google-auth-library";
 import { Readable } from "stream";
+import {
+  getServiceAccountKey,
+  getSpreadsheetId,
+  getDriveFolderId,
+} from "./env";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/drive.file",
 ];
 
-function getAuth() {
-  const credentials = JSON.parse(
-    process.env.GOOGLE_SERVICE_ACCOUNT_KEY || "{}"
-  );
-  const auth = new google.auth.GoogleAuth({
+// ─── Auth singleton ──────────────────────────────────────────────
+// Reusing the auth client across requests avoids re-parsing the
+// service-account JSON and re-negotiating tokens on every call.
+
+type AnyGoogleAuth = GoogleAuth<never>;
+
+let cachedAuth: AnyGoogleAuth | null = null;
+let cachedSheets: sheets_v4.Sheets | null = null;
+let cachedDrive: drive_v3.Drive | null = null;
+let cachedSheetIds: Map<string, number> | null = null;
+
+function getAuth(): AnyGoogleAuth {
+  if (cachedAuth) return cachedAuth;
+  const credentials = JSON.parse(getServiceAccountKey());
+  cachedAuth = new google.auth.GoogleAuth({
     credentials,
     scopes: SCOPES,
-  });
-  return auth;
+  }) as AnyGoogleAuth;
+  return cachedAuth;
 }
 
-export function getSheets() {
-  const auth = getAuth();
-  return google.sheets({ version: "v4", auth });
+export function getSheets(): sheets_v4.Sheets {
+  if (cachedSheets) return cachedSheets;
+  cachedSheets = google.sheets({ version: "v4", auth: getAuth() });
+  return cachedSheets;
 }
 
-export function getDrive() {
-  const auth = getAuth();
-  return google.drive({ version: "v3", auth });
+export function getDrive(): drive_v3.Drive {
+  if (cachedDrive) return cachedDrive;
+  cachedDrive = google.drive({ version: "v3", auth: getAuth() });
+  return cachedDrive;
 }
 
-const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || "";
-
-// ─── Sheet Helpers ───────────────────────────────────────────────
+// ─── Sheet helpers ───────────────────────────────────────────────
 
 export async function getSheetData(sheetName: string): Promise<string[][]> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
+    spreadsheetId: getSpreadsheetId(),
     range: `${sheetName}!A:Z`,
   });
   return (res.data.values as string[][]) || [];
 }
 
-export async function appendRow(sheetName: string, values: string[]) {
+export async function appendRow(
+  sheetName: string,
+  values: string[]
+): Promise<void> {
   const sheets = getSheets();
   await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
+    spreadsheetId: getSpreadsheetId(),
     range: `${sheetName}!A:Z`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [values] },
@@ -54,37 +73,48 @@ export async function updateRow(
   sheetName: string,
   rowIndex: number,
   values: string[]
-) {
+): Promise<void> {
   const sheets = getSheets();
   await sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
+    spreadsheetId: getSpreadsheetId(),
     range: `${sheetName}!A${rowIndex}:Z${rowIndex}`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [values] },
   });
 }
 
-export async function deleteRow(sheetName: string, rowIndex: number) {
+async function resolveSheetId(sheetName: string): Promise<number | null> {
+  if (!cachedSheetIds) cachedSheetIds = new Map();
+  if (cachedSheetIds.has(sheetName)) {
+    return cachedSheetIds.get(sheetName) ?? null;
+  }
   const sheets = getSheets();
-
-  const spreadsheet = await sheets.spreadsheets.get({
-    spreadsheetId: SPREADSHEET_ID,
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: getSpreadsheetId(),
   });
+  for (const s of meta.data.sheets ?? []) {
+    const title = s.properties?.title;
+    const id = s.properties?.sheetId;
+    if (title != null && id != null) cachedSheetIds.set(title, id);
+  }
+  return cachedSheetIds.get(sheetName) ?? null;
+}
 
-  const sheet = spreadsheet.data.sheets?.find(
-    (s) => s.properties?.title === sheetName
-  );
-
-  if (!sheet?.properties?.sheetId && sheet?.properties?.sheetId !== 0) return;
-
+export async function deleteRow(
+  sheetName: string,
+  rowIndex: number
+): Promise<void> {
+  const sheets = getSheets();
+  const sheetId = await resolveSheetId(sheetName);
+  if (sheetId == null) return;
   await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: SPREADSHEET_ID,
+    spreadsheetId: getSpreadsheetId(),
     requestBody: {
       requests: [
         {
           deleteDimension: {
             range: {
-              sheetId: sheet.properties.sheetId,
+              sheetId,
               dimension: "ROWS",
               startIndex: rowIndex - 1,
               endIndex: rowIndex,
@@ -96,9 +126,22 @@ export async function deleteRow(sheetName: string, rowIndex: number) {
   });
 }
 
-// ─── Drive Helpers ───────────────────────────────────────────────
+/**
+ * Returns the 1-based row index where `column` matches `value`, or -1 if not
+ * found. Skips header row (row 1).
+ */
+export function findRowIndex(
+  data: string[][],
+  column: number,
+  value: string
+): number {
+  for (let i = 1; i < data.length; i += 1) {
+    if ((data[i]?.[column] ?? "") === value) return i + 1; // 1-based
+  }
+  return -1;
+}
 
-const DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || "";
+// ─── Drive helpers ───────────────────────────────────────────────
 
 export async function uploadFileToDrive(
   fileName: string,
@@ -109,7 +152,7 @@ export async function uploadFileToDrive(
 
   const fileMetadata = {
     name: fileName,
-    parents: [DRIVE_FOLDER_ID],
+    parents: [getDriveFolderId()],
   };
 
   const media = {
@@ -123,13 +166,10 @@ export async function uploadFileToDrive(
     fields: "id, webViewLink",
   });
 
-  // Make file publicly viewable
+  // Make file publicly readable so it can be linked from the inventory UI.
   await drive.permissions.create({
     fileId: res.data.id!,
-    requestBody: {
-      role: "reader",
-      type: "anyone",
-    },
+    requestBody: { role: "reader", type: "anyone" },
   });
 
   return {
@@ -138,44 +178,28 @@ export async function uploadFileToDrive(
   };
 }
 
-// ─── ID Generation ───────────────────────────────────────────────
+// ─── ID generation ───────────────────────────────────────────────
+
+function nextSequentialId(rows: string[][], yearPrefix: string): string {
+  let maxNum = 0;
+  for (const row of rows) {
+    const id = row[0] || "";
+    if (id.startsWith(yearPrefix)) {
+      const numPart = parseInt(id.slice(yearPrefix.length), 10);
+      if (!Number.isNaN(numPart) && numPart > maxNum) maxNum = numPart;
+    }
+  }
+  return `${yearPrefix}${String(maxNum + 1).padStart(3, "0")}`;
+}
 
 export async function generateItemId(): Promise<string> {
   const year = new Date().getFullYear();
   const data = await getSheetData("Inventory");
-  const rows = data.slice(1); // skip header
-
-  const yearPrefix = `UGMALANG-INV-${year}-`;
-  let maxNum = 0;
-
-  for (const row of rows) {
-    const id = row[0] || "";
-    if (id.startsWith(yearPrefix)) {
-      const numPart = parseInt(id.replace(yearPrefix, ""), 10);
-      if (numPart > maxNum) maxNum = numPart;
-    }
-  }
-
-  const nextNum = String(maxNum + 1).padStart(3, "0");
-  return `${yearPrefix}${nextNum}`;
+  return nextSequentialId(data.slice(1), `UGMALANG-INV-${year}-`);
 }
 
 export async function generateRequestId(): Promise<string> {
   const year = new Date().getFullYear();
   const data = await getSheetData("Procurement");
-  const rows = data.slice(1);
-
-  const yearPrefix = `REQ-${year}-`;
-  let maxNum = 0;
-
-  for (const row of rows) {
-    const id = row[0] || "";
-    if (id.startsWith(yearPrefix)) {
-      const numPart = parseInt(id.replace(yearPrefix, ""), 10);
-      if (numPart > maxNum) maxNum = numPart;
-    }
-  }
-
-  const nextNum = String(maxNum + 1).padStart(3, "0");
-  return `${yearPrefix}${nextNum}`;
+  return nextSequentialId(data.slice(1), `REQ-${year}-`);
 }

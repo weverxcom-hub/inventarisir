@@ -8,6 +8,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import type { ProcurementRequest } from "@/types";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import { apiFetch } from "@/lib/fetcher";
 
 export default function ApprovalsPage() {
   const [requests, setRequests] = useState<ProcurementRequest[]>([]);
@@ -17,11 +19,12 @@ export default function ApprovalsPage() {
   const fetchRequests = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/procurement");
-      const data = await res.json();
+      const data = await apiFetch<{ requests: ProcurementRequest[] }>(
+        "/api/procurement"
+      );
       setRequests(data.requests || []);
     } catch {
-      // handle error
+      /* surfaced via toast */
     } finally {
       setLoading(false);
     }
@@ -31,15 +34,23 @@ export default function ApprovalsPage() {
     fetchRequests();
   }, [fetchRequests]);
 
-  const handleAction = async (requestId: string, status: "Approved" | "Rejected") => {
+  const handleAction = async (
+    requestId: string,
+    status: "Approved" | "Rejected"
+  ) => {
     setActing(requestId);
     try {
-      await fetch("/api/procurement", {
+      await apiFetch("/api/procurement", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ request_id: requestId, status }),
+        successMessage:
+          status === "Approved"
+            ? "Permintaan disetujui"
+            : "Permintaan ditolak",
       });
       await fetchRequests();
+    } catch {
+      /* toast */
     } finally {
       setActing(null);
     }
@@ -49,14 +60,7 @@ export default function ApprovalsPage() {
   const processed = requests.filter((r) => r.status !== "Pending");
 
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat persetujuan...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner fullPage text="Memuat persetujuan..." />;
   }
 
   return (
