@@ -16,7 +16,7 @@ import {
   Filter,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { InventoryItem, ItemCondition } from "@/types";
+import type { InventoryItem, ItemCondition, Unit } from "@/types";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { apiFetch } from "@/lib/fetcher";
@@ -81,6 +81,7 @@ export default function InventoryPage() {
   const isAdmin = role === "Admin";
 
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -94,8 +95,14 @@ export default function InventoryPage() {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiFetch<{ items: InventoryItem[] }>("/api/inventory");
-      setItems(data.items || []);
+      const [itemsRes, unitsRes] = await Promise.all([
+        apiFetch<{ items: InventoryItem[] }>("/api/inventory"),
+        apiFetch<{ units: Unit[] }>("/api/units").catch(() => ({
+          units: [] as Unit[],
+        })),
+      ]);
+      setItems(itemsRes.items || []);
+      setUnits(unitsRes.units || []);
     } catch {
       /* surfaced via toast */
     } finally {
@@ -345,6 +352,8 @@ export default function InventoryPage() {
       {showForm && (
         <ItemFormModal
           item={editItem}
+          units={units}
+          existingCategories={categories}
           saving={saving}
           onClose={() => {
             setShowForm(false);
@@ -384,18 +393,28 @@ interface ItemFormSubmit {
 
 function ItemFormModal({
   item,
+  units,
+  existingCategories,
   saving,
   onClose,
   onSubmit,
 }: {
   item: InventoryItem | null;
+  units: Unit[];
+  existingCategories: string[];
   saving: boolean;
   onClose: () => void;
   onSubmit: (data: ItemFormSubmit) => void;
 }) {
+  const knownUnitNames = useMemo(() => units.map((u) => u.name), [units]);
   const [name, setName] = useState(item?.name || "");
   const [category, setCategory] = useState(item?.category || "");
   const [quantity, setQuantity] = useState(item?.quantity || 1);
+  const initialLocationKnown =
+    item?.location && knownUnitNames.includes(item.location);
+  const [locationMode, setLocationMode] = useState<"unit" | "custom">(
+    initialLocationKnown ? "unit" : item?.location ? "custom" : "unit"
+  );
   const [location, setLocation] = useState(item?.location || "");
   const [condition, setCondition] = useState<ItemCondition>(
     item?.condition || "Good"
@@ -481,11 +500,18 @@ function ItemFormModal({
               </label>
               <input
                 type="text"
+                list="categories-suggest"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
+                placeholder="Elektronik, Mebel, ATK, ..."
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 required
               />
+              <datalist id="categories-suggest">
+                {existingCategories.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -504,15 +530,55 @@ function ItemFormModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                Lokasi
+                Lokasi / Unit
               </label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                required
-              />
+              {locationMode === "unit" && units.length > 0 ? (
+                <select
+                  value={location}
+                  onChange={(e) => {
+                    if (e.target.value === "__custom__") {
+                      setLocationMode("custom");
+                      setLocation("");
+                    } else {
+                      setLocation(e.target.value);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  required
+                >
+                  <option value="">Pilih unit...</option>
+                  {units.map((u) => (
+                    <option key={u.unit_id} value={u.name}>
+                      {u.name}
+                    </option>
+                  ))}
+                  <option value="__custom__">Lainnya (ketik manual)…</option>
+                </select>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Ruang / Unit"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    required
+                  />
+                  {units.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocationMode("unit");
+                        setLocation("");
+                      }}
+                      className="rounded-lg border border-gray-300 px-3 text-xs text-gray-600 hover:bg-gray-50"
+                      title="Pakai daftar unit"
+                    >
+                      Pilih
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">

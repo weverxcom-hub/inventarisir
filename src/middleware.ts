@@ -6,11 +6,24 @@ export default withAuth(
     const token = req.nextauth.token;
     const path = req.nextUrl.pathname;
 
-    if (path.startsWith("/dashboard/approvals") && token?.role !== "Approver" && token?.role !== "Admin") {
+    const isApproverPlus =
+      token?.role === "Approver" || token?.role === "Admin";
+    const isAdmin = token?.role === "Admin";
+
+    if (path.startsWith("/dashboard/approvals") && !isApproverPlus) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+    if (path.startsWith("/dashboard/handovers") && !isApproverPlus) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
-    if (path.startsWith("/dashboard/users") && token?.role !== "Admin") {
+    if (path.startsWith("/dashboard/users") && !isAdmin) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+    if (path.startsWith("/dashboard/units") && !isAdmin) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+    if (path.startsWith("/dashboard/inventory/print") && !isAdmin) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 

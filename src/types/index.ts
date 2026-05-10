@@ -38,3 +38,27 @@ export interface ProcurementRequest {
   nota_photo_drive_id: string;
   created_at: string;
 }
+
+export interface Unit {
+  unit_id: string;
+  name: string;
+  code: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Handover {
+  bast_id: string;
+  handover_date: string;
+  place: string;
+  giver_name: string;
+  giver_position: string;
+  receiver_name: string;
+  receiver_position: string;
+  receiver_unit: string;
+  item_ids: string[];
+  notes: string;
+  created_at: string;
+  created_by: string;
+}

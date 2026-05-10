@@ -166,16 +166,24 @@ export async function uploadFileToDrive(
     fields: "id, webViewLink",
   });
 
+  const fileId = res.data.id || "";
+  if (!fileId) {
+    throw new Error("Drive did not return a file id after upload");
+  }
+
   // Make file publicly readable so it can be linked from the inventory UI.
   await drive.permissions.create({
-    fileId: res.data.id!,
+    fileId,
     requestBody: { role: "reader", type: "anyone" },
   });
 
-  return {
-    fileId: res.data.id || "",
-    webViewLink: res.data.webViewLink || "",
-  };
+  // `webViewLink` can be null on freshly-created files until permissions
+  // settle. Fall back to the canonical Drive viewer URL — it is stable
+  // regardless of permission state.
+  const webViewLink =
+    res.data.webViewLink || `https://drive.google.com/file/d/${fileId}/view`;
+
+  return { fileId, webViewLink };
 }
 
 // ─── ID generation ───────────────────────────────────────────────
@@ -202,4 +210,42 @@ export async function generateRequestId(): Promise<string> {
   const year = new Date().getFullYear();
   const data = await getSheetData("Procurement");
   return nextSequentialId(data.slice(1), `REQ-${year}-`);
+}
+
+export async function generateUnitId(): Promise<string> {
+  const data = await getSheetData("Units");
+  return nextSequentialId(data.slice(1), "UNIT-");
+}
+
+export async function generateBastId(): Promise<string> {
+  const year = new Date().getFullYear();
+  const data = await getSheetData("Handovers");
+  return nextSequentialId(data.slice(1), `BAST-UGMALANG-${year}-`);
+}
+
+/**
+ * If a sheet/tab does not exist yet, create it with the given header row.
+ * Idempotent: safe to call on every cold start. Header is only written when
+ * the sheet is freshly created so we don't overwrite manual edits.
+ */
+export async function ensureSheet(
+  sheetName: string,
+  header: string[]
+): Promise<void> {
+  const sheetId = await resolveSheetId(sheetName);
+  if (sheetId != null) return;
+  const sheets = getSheets();
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: getSpreadsheetId(),
+    requestBody: {
+      requests: [{ addSheet: { properties: { title: sheetName } } }],
+    },
+  });
+  cachedSheetIds = null; // invalidate so next resolveSheetId re-fetches
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: getSpreadsheetId(),
+    range: `${sheetName}!A1`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [header] },
+  });
 }
