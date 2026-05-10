@@ -13,6 +13,7 @@ import {
   FileSignature,
   Printer,
   Settings as SettingsIcon,
+  BarChart3,
   LogOut,
   Menu,
   X,
@@ -32,6 +33,12 @@ const navItems = [
     label: "Inventaris",
     href: "/dashboard/inventory",
     icon: Package,
+    roles: ["Staff", "Approver", "Admin"],
+  },
+  {
+    label: "Laporan",
+    href: "/dashboard/laporan",
+    icon: BarChart3,
     roles: ["Staff", "Approver", "Admin"],
   },
   {

@@ -86,6 +86,7 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [conditionFilter, setConditionFilter] = useState("");
+  const [unitFilter, setUnitFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -122,6 +123,15 @@ export default function InventoryPage() {
     return Array.from(set).sort();
   }, [items]);
 
+  const unitOptions = useMemo(() => {
+    const set = new Set<string>();
+    units.forEach((u) => set.add(u.name));
+    items.forEach((it) => {
+      if (it.location) set.add(it.location);
+    });
+    return Array.from(set).sort();
+  }, [units, items]);
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return items.filter((item) => {
@@ -136,9 +146,10 @@ export default function InventoryPage() {
       }
       if (categoryFilter && item.category !== categoryFilter) return false;
       if (conditionFilter && item.condition !== conditionFilter) return false;
+      if (unitFilter && item.location !== unitFilter) return false;
       return true;
     });
-  }, [items, search, categoryFilter, conditionFilter]);
+  }, [items, search, categoryFilter, conditionFilter, unitFilter]);
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -259,6 +270,21 @@ export default function InventoryPage() {
             ))}
           </select>
         </div>
+        <div className="relative">
+          <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <select
+            value={unitFilter}
+            onChange={(e) => setUnitFilter(e.target.value)}
+            className="rounded-lg border border-gray-300 py-2 pl-9 pr-8 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            <option value="">Semua Unit</option>
+            {unitOptions.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        </div>
         <select
           value={conditionFilter}
           onChange={(e) => setConditionFilter(e.target.value)}
@@ -269,6 +295,19 @@ export default function InventoryPage() {
           <option value="Repair">Perlu Perbaikan</option>
           <option value="Broken">Rusak</option>
         </select>
+        {(search || categoryFilter || conditionFilter || unitFilter) && (
+          <button
+            onClick={() => {
+              setSearch("");
+              setCategoryFilter("");
+              setConditionFilter("");
+              setUnitFilter("");
+            }}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+          >
+            Reset
+          </button>
+        )}
       </div>
 
       {/* Table */}
