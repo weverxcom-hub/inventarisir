@@ -31,6 +31,7 @@ interface HandoverData {
   receiver_unit: string;
   item_ids: string[];
   notes: string;
+  nomor_surat: string;
   created_at: string;
   created_by: string;
 }
@@ -43,6 +44,7 @@ export default function HandoverPrintPage() {
 
   const [handover, setHandover] = useState<HandoverData | null>(null);
   const [items, setItems] = useState<HandoverItem[]>([]);
+  const [letterheadUrl, setLetterheadUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -59,6 +61,7 @@ export default function HandoverPrintPage() {
         if (!mounted) return;
         setHandover(data.handover);
         setItems(data.items || []);
+        setLetterheadUrl(data.settings?.letterhead_url || "");
       } catch {
         if (mounted) setError("Gagal memuat berita acara");
       } finally {
@@ -134,26 +137,38 @@ export default function HandoverPrintPage() {
       {/* Printable sheet — A4 dimensions */}
       <div className="mx-auto w-full max-w-[210mm] bg-white p-[18mm] text-sm leading-relaxed text-gray-900 shadow-sm print:max-w-none print:p-[18mm] print:shadow-none">
         {/* Kop */}
-        <header className="mb-6 flex items-center gap-4 border-b-4 border-double border-gray-800 pb-3">
-          <div className="shrink-0">
-            <Logo size={72} />
-          </div>
-          <div className="flex-1 text-center">
-            <p className="text-[11px] font-semibold tracking-widest text-gray-700">
-              YAYASAN PENDIDIKAN GAJAYANA
-            </p>
-            <h1 className="text-xl font-bold uppercase tracking-wide text-gray-900">
-              Universitas Gajayana Malang
-            </h1>
-            <p className="text-[10px] text-gray-600">
-              Jl. Mertojoyo Blok L &middot; Merjosari, Lowokwaru, Malang
-              &middot; Telp. (0341) 562411
-            </p>
-            <p className="text-[10px] text-gray-600">
-              Website: unigamalang.ac.id
-            </p>
-          </div>
-        </header>
+        {letterheadUrl ? (
+          // Custom letterhead uploaded by Admin via Settings page.
+          // Rendered as a single image so the official kop format stays
+          // pixel-perfect regardless of how it was designed.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={letterheadUrl}
+            alt="Kop Surat"
+            className="mb-6 block w-full border-b-4 border-double border-gray-800 pb-3"
+          />
+        ) : (
+          <header className="mb-6 flex items-center gap-4 border-b-4 border-double border-gray-800 pb-3">
+            <div className="shrink-0">
+              <Logo size={72} />
+            </div>
+            <div className="flex-1 text-center">
+              <p className="text-[11px] font-semibold tracking-widest text-gray-700">
+                YAYASAN PENDIDIKAN GAJAYANA
+              </p>
+              <h1 className="text-xl font-bold uppercase tracking-wide text-gray-900">
+                Universitas Gajayana Malang
+              </h1>
+              <p className="text-[10px] text-gray-600">
+                Jl. Mertojoyo Blok L &middot; Merjosari, Lowokwaru, Malang
+                &middot; Telp. (0341) 562411
+              </p>
+              <p className="text-[10px] text-gray-600">
+                Website: unigamalang.ac.id
+              </p>
+            </div>
+          </header>
+        )}
 
         {/* Title */}
         <div className="mb-5 text-center">
@@ -161,7 +176,10 @@ export default function HandoverPrintPage() {
             Berita Acara Serah Terima Barang
           </h2>
           <p className="mt-1 text-xs text-gray-700">
-            Nomor: <span className="font-semibold">{handover.bast_id}</span>
+            Nomor:{" "}
+            <span className="font-semibold">
+              {handover.nomor_surat || handover.bast_id}
+            </span>
           </p>
         </div>
 

@@ -59,6 +59,11 @@ export interface Handover {
   receiver_unit: string;
   item_ids: string[];
   notes: string;
+  nomor_surat: string;
   created_at: string;
   created_by: string;
+}
+
+export interface AppSettings {
+  letterhead_url: string;
 }

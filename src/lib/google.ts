@@ -249,3 +249,35 @@ export async function ensureSheet(
     requestBody: { values: [header] },
   });
 }
+
+// ─── Settings (key/value) ────────────────────────────────────────
+
+const SETTINGS_HEADER = ["key", "value", "updated_at"];
+
+/** Returns all settings as a flat key→value object. */
+export async function getSettings(): Promise<Record<string, string>> {
+  await ensureSheet("Settings", SETTINGS_HEADER);
+  const data = await getSheetData("Settings");
+  const out: Record<string, string> = {};
+  for (const row of data.slice(1)) {
+    const k = row[0];
+    if (k) out[k] = row[1] || "";
+  }
+  return out;
+}
+
+/** Insert or update a single setting key. */
+export async function setSetting(
+  key: string,
+  value: string
+): Promise<void> {
+  await ensureSheet("Settings", SETTINGS_HEADER);
+  const data = await getSheetData("Settings");
+  const rowIndex = findRowIndex(data, 0, key);
+  const now = new Date().toISOString();
+  if (rowIndex === -1) {
+    await appendRow("Settings", [key, value, now]);
+  } else {
+    await updateRow("Settings", rowIndex, [key, value, now]);
+  }
+}

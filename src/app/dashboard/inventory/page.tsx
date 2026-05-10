@@ -456,7 +456,7 @@ function ItemFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-4 shadow-xl max-h-[90vh] overflow-y-auto sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">
             {item ? "Edit Item" : "Tambah Item Baru"}
@@ -469,6 +469,18 @@ function ItemFormModal({
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            // For new items, foto + nota are required (per UNIGA policy).
+            // Edit keeps the existing values so legacy data is not blocked.
+            if (!item) {
+              if (!photoUrl) {
+                toast.error("Foto item wajib diunggah");
+                return;
+              }
+              if (!receiptUrl) {
+                toast.error("Foto nota pembelian wajib diunggah");
+                return;
+              }
+            }
             onSubmit({
               name: name.trim(),
               category: category.trim(),
@@ -493,7 +505,7 @@ function ItemFormModal({
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Kategori
@@ -527,7 +539,7 @@ function ItemFormModal({
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Lokasi / Unit
@@ -605,6 +617,7 @@ function ItemFormModal({
             url={photoUrl}
             uploading={uploadingField === "photo"}
             disabled={!!uploadingField}
+            required={!item}
             onChange={(file) => upload("photo", file)}
             onClear={() => setPhotoUrl("")}
           />
@@ -614,6 +627,7 @@ function ItemFormModal({
             url={receiptUrl}
             uploading={uploadingField === "receipt"}
             disabled={!!uploadingField}
+            required={!item}
             onChange={(file) => upload("receipt", file)}
             onClear={() => setReceiptUrl("")}
           />
@@ -646,6 +660,7 @@ function UploadField({
   url,
   uploading,
   disabled,
+  required = false,
   onChange,
   onClear,
 }: {
@@ -653,17 +668,27 @@ function UploadField({
   url: string;
   uploading: boolean;
   disabled: boolean;
+  required?: boolean;
   onChange: (file: File) => void;
   onClear: () => void;
 }) {
+  const missing = required && !url && !uploading;
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-gray-700">
         {label}{" "}
-        <span className="text-xs font-normal text-gray-400">(opsional)</span>
+        {required ? (
+          <span className="text-xs font-semibold text-red-600">*wajib</span>
+        ) : (
+          <span className="text-xs font-normal text-gray-400">(opsional)</span>
+        )}
       </label>
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+        <label
+          className={`flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 ${
+            missing ? "border-red-400 bg-red-50" : "border-gray-300"
+          }`}
+        >
           {uploading ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (

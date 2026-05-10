@@ -17,8 +17,14 @@ export const inventoryCreateSchema = z.object({
   quantity: z.coerce.number().int().min(0).max(1_000_000),
   location: z.string().trim().min(1, "Lokasi wajib diisi").max(200),
   condition: itemConditionSchema.optional().default("Good"),
-  photo_url: z.string().url().optional().or(z.literal("")),
-  receipt_url: z.string().url().optional().or(z.literal("")),
+  photo_url: z
+    .string()
+    .url("URL foto tidak valid")
+    .min(1, "Foto item wajib diunggah"),
+  receipt_url: z
+    .string()
+    .url("URL nota tidak valid")
+    .min(1, "Foto nota wajib diunggah"),
 });
 
 export const inventoryUpdateSchema = inventoryCreateSchema.partial();
@@ -87,5 +93,14 @@ export const handoverCreateSchema = z.object({
     .array(z.string().trim().min(1))
     .min(1, "Minimal satu barang harus dipilih"),
   notes: z.string().trim().max(2000).optional().default(""),
+  nomor_surat: z.string().trim().max(120).optional().default(""),
   update_inventory_location: z.boolean().optional().default(true),
+});
+
+export const settingsUpdateSchema = z.object({
+  letterhead_url: z
+    .string()
+    .url("URL kop surat tidak valid")
+    .or(z.literal(""))
+    .optional(),
 });
