@@ -29,6 +29,7 @@ const HANDOVERS_HEADER = [
   "notes",
   "created_at",
   "created_by",
+  "nomor_surat",
 ];
 
 function rowToHandover(row: string[]) {
@@ -48,6 +49,7 @@ function rowToHandover(row: string[]) {
     notes: row[9] || "",
     created_at: row[10] || "",
     created_by: row[11] || "",
+    nomor_surat: row[12] || "",
   };
 }
 
@@ -97,6 +99,7 @@ export const POST = apiHandler(async (req: NextRequest) => {
     body.notes || "",
     now,
     session.user.email || "",
+    body.nomor_surat || "",
   ]);
 
   // Optional: when items handed over, mark their inventory location as the

@@ -203,6 +203,7 @@ interface HandoverFormData {
   receiver_unit: string;
   item_ids: string[];
   notes: string;
+  nomor_surat: string;
   update_inventory_location: boolean;
 }
 
@@ -232,6 +233,7 @@ function HandoverFormModal({
   const [receiverUnitCustom, setReceiverUnitCustom] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState("");
+  const [nomorSurat, setNomorSurat] = useState("");
   const [updateInventoryLocation, setUpdateInventoryLocation] = useState(true);
   const [itemSearch, setItemSearch] = useState("");
 
@@ -267,7 +269,7 @@ function HandoverFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl max-h-[92vh] overflow-y-auto">
+      <div className="w-full max-w-3xl rounded-2xl bg-white p-4 shadow-xl max-h-[92vh] overflow-y-auto sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Buat Berita Acara Serah Terima</h2>
           <button onClick={onClose} className="rounded p-1 hover:bg-gray-100">
@@ -289,12 +291,34 @@ function HandoverFormModal({
               receiver_unit: finalUnit,
               item_ids: Array.from(selected),
               notes: notes.trim(),
+              nomor_surat: nomorSurat.trim(),
               update_inventory_location: updateInventoryLocation,
             });
           }}
           className="space-y-4"
         >
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Nomor Surat{" "}
+              <span className="text-xs font-normal text-gray-400">
+                (opsional — isi kalau pakai format penomoran sendiri)
+              </span>
+            </label>
+            <input
+              type="text"
+              value={nomorSurat}
+              onChange={(e) => setNomorSurat(e.target.value)}
+              placeholder="contoh: 001/BAST/UNIGA/V/2026"
+              maxLength={120}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Kalau dikosongkan, sistem otomatis pakai ID internal
+              <span className="font-mono"> BAST-UGMALANG-...</span> sebagai nomor.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Tanggal Serah Terima
@@ -325,7 +349,7 @@ function HandoverFormModal({
             <legend className="px-2 text-xs font-semibold uppercase text-gray-500">
               Pihak yang Menyerahkan
             </legend>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Nama
@@ -360,7 +384,7 @@ function HandoverFormModal({
             <legend className="px-2 text-xs font-semibold uppercase text-gray-500">
               Pihak yang Menerima
             </legend>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Nama

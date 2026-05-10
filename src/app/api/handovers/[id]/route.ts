@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSheetData } from "@/lib/google";
+import { getSettings, getSheetData } from "@/lib/google";
 import { apiHandler, notFound } from "@/lib/api";
 
 export const GET = apiHandler(
@@ -26,6 +26,7 @@ export const GET = apiHandler(
       notes: row[9] || "",
       created_at: row[10] || "",
       created_by: row[11] || "",
+      nomor_surat: row[12] || "",
     };
 
     // Hydrate items so the public page can render the table without
@@ -46,6 +47,10 @@ export const GET = apiHandler(
       };
     });
 
-    return NextResponse.json({ handover, items });
+    // Inline the active app settings (e.g. custom letterhead URL) so the
+    // public BAST print page can render with one fetch.
+    const settings = await getSettings();
+
+    return NextResponse.json({ handover, items, settings });
   }
 );

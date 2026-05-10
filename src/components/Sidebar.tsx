@@ -12,6 +12,7 @@ import {
   Building2,
   FileSignature,
   Printer,
+  Settings as SettingsIcon,
   LogOut,
   Menu,
   X,
@@ -67,6 +68,12 @@ const navItems = [
     label: "Pengguna",
     href: "/dashboard/users",
     icon: Users,
+    roles: ["Admin"],
+  },
+  {
+    label: "Pengaturan",
+    href: "/dashboard/settings",
+    icon: SettingsIcon,
     roles: ["Admin"],
   },
 ];
