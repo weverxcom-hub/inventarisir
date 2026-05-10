@@ -58,3 +58,34 @@ export const bootstrapSchema = z.object({
   email: z.string().email().toLowerCase(),
   password: z.string().min(8, "Password admin minimal 8 karakter").max(200),
 });
+
+export const unitCreateSchema = z.object({
+  name: z.string().trim().min(1, "Nama unit wajib diisi").max(200),
+  code: z.string().trim().max(40).optional().default(""),
+  description: z.string().trim().max(500).optional().default(""),
+});
+
+export const unitUpdateSchema = unitCreateSchema.partial();
+
+export const handoverCreateSchema = z.object({
+  handover_date: z.string().trim().min(1, "Tanggal wajib diisi"),
+  place: z.string().trim().min(1, "Tempat wajib diisi").max(200),
+  giver_name: z.string().trim().min(1, "Nama pemberi wajib diisi").max(200),
+  giver_position: z.string().trim().max(200).optional().default(""),
+  receiver_name: z
+    .string()
+    .trim()
+    .min(1, "Nama penerima wajib diisi")
+    .max(200),
+  receiver_position: z.string().trim().max(200).optional().default(""),
+  receiver_unit: z
+    .string()
+    .trim()
+    .min(1, "Unit penerima wajib diisi")
+    .max(200),
+  item_ids: z
+    .array(z.string().trim().min(1))
+    .min(1, "Minimal satu barang harus dipilih"),
+  notes: z.string().trim().max(2000).optional().default(""),
+  update_inventory_location: z.boolean().optional().default(true),
+});

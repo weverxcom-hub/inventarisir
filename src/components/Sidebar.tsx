@@ -9,6 +9,9 @@ import {
   ShoppingCart,
   CheckSquare,
   Users,
+  Building2,
+  FileSignature,
+  Printer,
   LogOut,
   Menu,
   X,
@@ -31,6 +34,12 @@ const navItems = [
     roles: ["Staff", "Approver", "Admin"],
   },
   {
+    label: "Cetak Stiker",
+    href: "/dashboard/inventory/print",
+    icon: Printer,
+    roles: ["Admin"],
+  },
+  {
     label: "Pengadaan",
     href: "/dashboard/procurement",
     icon: ShoppingCart,
@@ -41,6 +50,18 @@ const navItems = [
     href: "/dashboard/approvals",
     icon: CheckSquare,
     roles: ["Approver", "Admin"],
+  },
+  {
+    label: "Berita Acara",
+    href: "/dashboard/handovers",
+    icon: FileSignature,
+    roles: ["Approver", "Admin"],
+  },
+  {
+    label: "Unit",
+    href: "/dashboard/units",
+    icon: Building2,
+    roles: ["Admin"],
   },
   {
     label: "Pengguna",
