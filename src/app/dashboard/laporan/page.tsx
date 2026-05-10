@@ -473,10 +473,23 @@ export default function ReportsPage() {
             <tbody className="divide-y">
               {filtered.map((item) => (
                 <tr key={item.item_id} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-blue-600">
-                    {item.item_id}
+                  <td className="whitespace-nowrap px-4 py-2 font-mono text-xs">
+                    <Link
+                      href={`/item/${item.item_id}`}
+                      className="text-blue-600 hover:underline"
+                      title="Lihat detail item"
+                    >
+                      {item.item_id}
+                    </Link>
                   </td>
-                  <td className="px-4 py-2 font-medium">{item.name}</td>
+                  <td className="px-4 py-2 font-medium">
+                    <Link
+                      href={`/item/${item.item_id}`}
+                      className="hover:underline"
+                    >
+                      {item.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2 text-gray-500">{item.category}</td>
                   <td className="px-4 py-2 text-right">{item.quantity}</td>
                   <td className="px-4 py-2 text-gray-500">{item.location}</td>
