@@ -1,7 +1,8 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export default withAuth(
+const authMiddleware = withAuth(
   function middleware(req) {
     const token = req.nextauth.token;
     const path = req.nextUrl.pathname;
@@ -23,6 +24,14 @@ export default withAuth(
   }
 );
 
+export default function middleware(req: NextRequest) {
+  // Allow SSO callback route through without auth check
+  if (req.nextUrl.pathname.startsWith("/auth/")) {
+    return NextResponse.next();
+  }
+  return (authMiddleware as unknown as (req: NextRequest) => Promise<NextResponse>)(req);
+}
+
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/auth/:path*"],
 };

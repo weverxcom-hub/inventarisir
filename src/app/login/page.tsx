@@ -101,6 +101,25 @@ export default function LoginPage() {
             )}
             {loading ? "Memproses..." : "Masuk"}
           </button>
+
+          {process.env.NEXT_PUBLIC_SSO_LOGIN_URL && (
+            <>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-gray-400">atau</span>
+                </div>
+              </div>
+              <a
+                href={process.env.NEXT_PUBLIC_SSO_LOGIN_URL}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                Masuk dengan UNIGA SSO
+              </a>
+            </>
+          )}
         </form>
 
         <p className="mt-6 text-center text-xs text-blue-300">
