@@ -115,13 +115,34 @@ export default function ReportsPage() {
     fetchData();
   }, [fetchData]);
 
+  // Filter is applied first so summary cards + per-kategori table reflect
+  // the active filter. Per-unit overview keeps using `items` so it can
+  // still be used as a navigation table (clicking Eye applies a filter).
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return items.filter((item) => {
+      if (
+        needle &&
+        !item.name.toLowerCase().includes(needle) &&
+        !item.item_id.toLowerCase().includes(needle) &&
+        !item.category.toLowerCase().includes(needle) &&
+        !item.location.toLowerCase().includes(needle)
+      ) {
+        return false;
+      }
+      if (unitFilter && item.location !== unitFilter) return false;
+      if (conditionFilter && item.condition !== conditionFilter) return false;
+      return true;
+    });
+  }, [items, search, unitFilter, conditionFilter]);
+
   const summary = useMemo(() => {
-    const total = items.reduce((acc, it) => acc + (it.quantity || 0), 0);
-    const good = items.filter((it) => it.condition === "Good").length;
-    const repair = items.filter((it) => it.condition === "Repair").length;
-    const broken = items.filter((it) => it.condition === "Broken").length;
-    return { count: items.length, total, good, repair, broken };
-  }, [items]);
+    const total = filtered.reduce((acc, it) => acc + (it.quantity || 0), 0);
+    const good = filtered.filter((it) => it.condition === "Good").length;
+    const repair = filtered.filter((it) => it.condition === "Repair").length;
+    const broken = filtered.filter((it) => it.condition === "Broken").length;
+    return { count: filtered.length, total, good, repair, broken };
+  }, [filtered]);
 
   const unitOptions = useMemo(() => {
     const set = new Set<string>();
@@ -132,6 +153,9 @@ export default function ReportsPage() {
     return Array.from(set).sort();
   }, [units, items]);
 
+  // Always built from the full dataset — used as a navigation table on
+  // screen, hidden from print when a unit filter is active (because
+  // it'd just be a one-row table at the top of the printout).
   const unitGroups = useMemo<UnitGroup[]>(() => {
     const map = new Map<string, UnitGroup>();
     items.forEach((it) => {
@@ -152,7 +176,7 @@ export default function ReportsPage() {
 
   const categoryGroups = useMemo<CategoryGroup[]>(() => {
     const map = new Map<string, CategoryGroup>();
-    items.forEach((it) => {
+    filtered.forEach((it) => {
       const key = it.category?.trim() || "(Tanpa Kategori)";
       let g = map.get(key);
       if (!g) {
@@ -163,25 +187,7 @@ export default function ReportsPage() {
       g.qty += it.quantity || 0;
     });
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
-  }, [items]);
-
-  const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return items.filter((item) => {
-      if (
-        needle &&
-        !item.name.toLowerCase().includes(needle) &&
-        !item.item_id.toLowerCase().includes(needle) &&
-        !item.category.toLowerCase().includes(needle) &&
-        !item.location.toLowerCase().includes(needle)
-      ) {
-        return false;
-      }
-      if (unitFilter && item.location !== unitFilter) return false;
-      if (conditionFilter && item.condition !== conditionFilter) return false;
-      return true;
-    });
-  }, [items, search, unitFilter, conditionFilter]);
+  }, [filtered]);
 
   if (loading) {
     return <LoadingSpinner fullPage text="Memuat laporan..." />;
@@ -267,7 +273,11 @@ export default function ReportsPage() {
           </div>
         </div>
         <div className="mt-2 flex items-baseline justify-between">
-          <h1 className="text-lg font-bold">Laporan Inventaris</h1>
+          <h1 className="text-lg font-bold">
+            {unitFilter
+              ? `Laporan Inventaris — ${unitFilter}`
+              : "Laporan Inventaris"}
+          </h1>
           <p className="text-xs text-gray-600">Dicetak: {printedAt}</p>
         </div>
         {filterSummary && (
@@ -275,6 +285,9 @@ export default function ReportsPage() {
             Filter aktif — {filterSummary}
           </p>
         )}
+        <p className="mt-1 text-xs text-gray-600">
+          Menampilkan {filtered.length} dari {items.length} item inventaris.
+        </p>
       </div>
 
       {/* Header (screen) */}
@@ -341,8 +354,16 @@ export default function ReportsPage() {
       </div>
 
       {/* Per Unit + Per Kategori */}
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm print-card">
+      <div
+        className={`mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2 ${
+          unitFilter ? "print:lg:grid-cols-1" : ""
+        }`}
+      >
+        <div
+          className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm print-card ${
+            unitFilter ? "print:hidden" : ""
+          }`}
+        >
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700">
             <Building2 size={16} />
             Inventaris per Unit / Lokasi
