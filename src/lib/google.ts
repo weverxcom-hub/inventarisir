@@ -160,10 +160,13 @@ export async function uploadFileToDrive(
     body: Readable.from(buffer),
   };
 
+  // `supportsAllDrives: true` is required when the target folder lives in a
+  // Shared Drive (Drive bersama). Harmless for ordinary My Drive folders.
   const res = await drive.files.create({
     requestBody: fileMetadata,
     media,
     fields: "id, webViewLink",
+    supportsAllDrives: true,
   });
 
   const fileId = res.data.id || "";
@@ -175,6 +178,7 @@ export async function uploadFileToDrive(
   await drive.permissions.create({
     fileId,
     requestBody: { role: "reader", type: "anyone" },
+    supportsAllDrives: true,
   });
 
   // `webViewLink` can be null on freshly-created files until permissions
