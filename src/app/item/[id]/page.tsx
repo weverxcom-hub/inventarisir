@@ -12,6 +12,9 @@ import {
   Loader2,
   Package,
   ArrowLeft,
+  ImageIcon,
+  Receipt,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import type { InventoryItem } from "@/types";
@@ -87,9 +90,12 @@ export default function ItemDetailPage() {
 
   const cond = conditionStyles[item.condition] || conditionStyles.Good;
 
+  const photoSrc = toPreviewUrl(item.photo_url);
+  const receiptSrc = toPreviewUrl(item.receipt_url);
+
   return (
     <div className="flex min-h-screen flex-col bg-gray-50 px-4 py-8">
-      <div className="mx-auto w-full max-w-2xl flex-1">
+      <div className="mx-auto w-full max-w-3xl flex-1">
         {/* Brand header */}
         <div className="mb-6 flex items-center justify-center gap-3">
           <Logo size={36} />
@@ -145,7 +151,7 @@ export default function ItemDetailPage() {
                 {cond.label}
               </span>
 
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <DetailRow
                   icon={<Tag size={16} className="text-gray-400" />}
                   label="Kategori"
@@ -158,7 +164,7 @@ export default function ItemDetailPage() {
                 />
                 <DetailRow
                   icon={<MapPin size={16} className="text-gray-400" />}
-                  label="Lokasi"
+                  label="Lokasi / Unit"
                   value={item.location}
                 />
                 <DetailRow
@@ -177,6 +183,24 @@ export default function ItemDetailPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Photo + Nota */}
+        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+          <AssetCard
+            title="Foto Item"
+            icon={<ImageIcon size={16} />}
+            previewSrc={photoSrc}
+            originalUrl={item.photo_url}
+            emptyLabel="Belum ada foto item diunggah."
+          />
+          <AssetCard
+            title="Nota Pembelian"
+            icon={<Receipt size={16} />}
+            previewSrc={receiptSrc}
+            originalUrl={item.receipt_url}
+            emptyLabel="Belum ada foto nota diunggah."
+          />
         </div>
 
         {/* Print Label (hidden on screen, visible on print) */}
@@ -219,6 +243,91 @@ function DetailRow({
         <p className="text-xs text-gray-400">{label}</p>
         <p className="text-sm font-medium text-gray-800">{value || "-"}</p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Convert a Google Drive `webViewLink` (https://drive.google.com/file/d/{id}/view)
+ * into an inline-renderable thumbnail URL. For non-Drive URLs, return as-is.
+ */
+function toPreviewUrl(url: string): string {
+  if (!url) return "";
+  const driveMatch = url.match(/\/file\/d\/([^/]+)/);
+  if (driveMatch) {
+    return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`;
+  }
+  return url;
+}
+
+function AssetCard({
+  title,
+  icon,
+  previewSrc,
+  originalUrl,
+  emptyLabel,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  previewSrc: string;
+  originalUrl: string;
+  emptyLabel: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+          {icon}
+          {title}
+        </h2>
+        {originalUrl && (
+          <a
+            href={originalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+            title="Buka di tab baru"
+          >
+            <ExternalLink size={12} />
+            Buka
+          </a>
+        )}
+      </div>
+      {originalUrl ? (
+        <a
+          href={originalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block overflow-hidden rounded-xl border border-gray-200 bg-gray-50"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewSrc}
+            alt={title}
+            className="aspect-video w-full bg-white object-contain"
+            onError={(e) => {
+              const t = e.currentTarget;
+              t.onerror = null;
+              t.style.display = "none";
+              const fallback = t.parentElement?.querySelector(
+                "[data-fallback]"
+              ) as HTMLElement | null;
+              if (fallback) fallback.style.display = "flex";
+            }}
+          />
+          <div
+            data-fallback
+            style={{ display: "none" }}
+            className="aspect-video w-full items-center justify-center bg-gray-50 text-xs text-gray-400"
+          >
+            Pratinjau tidak tersedia — klik untuk buka file asli
+          </div>
+        </a>
+      ) : (
+        <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-xs text-gray-400">
+          {emptyLabel}
+        </div>
+      )}
     </div>
   );
 }
