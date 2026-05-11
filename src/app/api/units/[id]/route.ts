@@ -13,6 +13,8 @@ import {
 } from "@/lib/api";
 import { unitUpdateSchema } from "@/lib/validation";
 
+export const dynamic = "force-dynamic";
+
 export const PUT = apiHandler(
   async (req: NextRequest, { params }: { params: { id: string } }) => {
     await requireRoles(["Admin"]);

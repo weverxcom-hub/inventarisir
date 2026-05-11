@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSettings, getSheetData } from "@/lib/google";
 import { apiHandler, notFound } from "@/lib/api";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(
   async (_req: NextRequest, { params }: { params: { id: string } }) => {
     // Public so QR-style "view BAST" links work without login. Sensitive

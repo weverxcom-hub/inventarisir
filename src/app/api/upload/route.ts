@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { uploadFileToDrive } from "@/lib/google";
 import { apiHandler, badRequest, requireSession } from "@/lib/api";
 
+export const dynamic = "force-dynamic";
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_MIME_PREFIXES = ["image/", "application/pdf"];
 

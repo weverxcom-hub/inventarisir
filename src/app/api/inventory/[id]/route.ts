@@ -13,6 +13,8 @@ import {
 } from "@/lib/api";
 import { inventoryUpdateSchema } from "@/lib/validation";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(
   async (_req: NextRequest, { params }: { params: { id: string } }) => {
     const data = await getSheetData("Inventory");

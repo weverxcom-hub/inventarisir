@@ -16,6 +16,8 @@ import {
 } from "@/lib/api";
 import { handoverCreateSchema } from "@/lib/validation";
 
+export const dynamic = "force-dynamic";
+
 const HANDOVERS_HEADER = [
   "bast_id",
   "handover_date",

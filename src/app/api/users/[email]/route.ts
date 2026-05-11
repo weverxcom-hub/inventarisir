@@ -14,6 +14,8 @@ import {
 } from "@/lib/api";
 import { userUpdateSchema } from "@/lib/validation";
 
+export const dynamic = "force-dynamic";
+
 function normalizeEmail(value: string): string {
   return decodeURIComponent(value).trim().toLowerCase();
 }

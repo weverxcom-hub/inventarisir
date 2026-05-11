@@ -9,6 +9,8 @@ import {
 } from "@/lib/api";
 import { userCreateSchema } from "@/lib/validation";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(async () => {
   await requireRoles(["Admin"]);
 

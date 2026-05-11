@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDrive } from "@/lib/google";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Health-check endpoint that surfaces *which* required environment variables
  * are missing without leaking their values. Useful when diagnosing the
