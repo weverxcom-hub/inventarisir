@@ -21,6 +21,8 @@ import {
   procurementCreateSchema,
 } from "@/lib/validation";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(async () => {
   await requireSession();
 

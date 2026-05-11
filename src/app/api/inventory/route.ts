@@ -8,6 +8,8 @@ import { apiHandler, parseJson, requireRoles } from "@/lib/api";
 import { getAppUrl } from "@/lib/env";
 import { inventoryCreateSchema } from "@/lib/validation";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(async () => {
   const data = await getSheetData("Inventory");
   const rows = data.slice(1);

@@ -3,6 +3,11 @@ import { getSettings, setSetting } from "@/lib/google";
 import { apiHandler, parseJson, requireRoles } from "@/lib/api";
 import { settingsUpdateSchema } from "@/lib/validation";
 
+// Mark as fully dynamic so Next.js does not prerender the GET handler as a
+// static asset — when that happens, Vercel only allows GET/HEAD/OPTIONS and
+// returns 405 for PUT/POST/DELETE on the same path.
+export const dynamic = "force-dynamic";
+
 // Public read so the BAST print page can render the custom letterhead
 // without forcing a login. The values stored here are non-sensitive
 // (URLs to public Drive images).

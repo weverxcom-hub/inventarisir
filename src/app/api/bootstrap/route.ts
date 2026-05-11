@@ -4,6 +4,8 @@ import { getSheetData, appendRow } from "@/lib/google";
 import { apiHandler, badRequest, parseJson } from "@/lib/api";
 import { bootstrapSchema } from "@/lib/validation";
 
+export const dynamic = "force-dynamic";
+
 /**
  * POST /api/bootstrap
  *

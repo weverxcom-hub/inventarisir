@@ -14,6 +14,8 @@ import {
 } from "@/lib/api";
 import { unitCreateSchema } from "@/lib/validation";
 
+export const dynamic = "force-dynamic";
+
 const UNITS_HEADER = [
   "unit_id",
   "name",
