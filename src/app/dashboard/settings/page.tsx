@@ -7,6 +7,7 @@ import { Loader2, Upload, Trash2, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { apiFetch } from "@/lib/fetcher";
+import { toPreviewUrl } from "@/lib/drive";
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -130,7 +131,7 @@ export default function SettingsPage() {
             <div className="flex flex-col items-start gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={letterheadUrl}
+                src={toPreviewUrl(letterheadUrl, 1450)}
                 alt="Kop surat saat ini"
                 className="max-h-40 w-full max-w-full rounded border border-gray-200 bg-white object-contain p-2"
               />
