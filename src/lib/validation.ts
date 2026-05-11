@@ -93,7 +93,11 @@ export const handoverCreateSchema = z.object({
     .array(z.string().trim().min(1))
     .min(1, "Minimal satu barang harus dipilih"),
   notes: z.string().trim().max(2000).optional().default(""),
-  nomor_surat: z.string().trim().max(120).optional().default(""),
+  nomor_surat: z
+    .string()
+    .trim()
+    .min(1, "Nomor surat wajib diisi (mis. 02/UNIGA/BERITA-ACARA/V/2026)")
+    .max(120),
   update_inventory_location: z.boolean().optional().default(true),
 });
 

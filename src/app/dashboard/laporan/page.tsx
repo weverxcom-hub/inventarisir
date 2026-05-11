@@ -197,6 +197,21 @@ export default function ReportsPage() {
         .slice(0, 10)}.csv`
     : `inventaris-laporan-${new Date().toISOString().slice(0, 10)}.csv`;
 
+  const printedAt = new Date().toLocaleString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const filterSummary = [
+    unitFilter ? `Unit: ${unitFilter}` : null,
+    conditionFilter ? `Kondisi: ${CONDITION_LABEL[conditionFilter] || conditionFilter}` : null,
+    search ? `Cari: "${search}"` : null,
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
   return (
     <div className="print:bg-white">
       <style jsx global>{`
@@ -211,15 +226,59 @@ export default function ReportsPage() {
           }
           body {
             background: white !important;
+            color: #000 !important;
+            font-size: 11pt;
+          }
+          .print-only {
+            display: block !important;
           }
           .print-card {
             break-inside: avoid;
+            box-shadow: none !important;
+            border-color: #d1d5db !important;
           }
+          table {
+            font-size: 10pt;
+          }
+          @page {
+            size: A4;
+            margin: 14mm 12mm;
+          }
+        }
+        .print-only {
+          display: none;
         }
       `}</style>
 
-      {/* Header */}
-      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Print-only header (UNIGA + timestamp + filter context) */}
+      <div className="print-only mb-4 border-b-2 border-gray-800 pb-3">
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-uniga.png"
+            alt="UNIGA"
+            style={{ width: "44px", height: "44px" }}
+          />
+          <div>
+            <p className="text-base font-bold">Universitas Gajayana Malang</p>
+            <p className="text-xs text-gray-600">
+              Sistem Inventaris & Pengadaan
+            </p>
+          </div>
+        </div>
+        <div className="mt-2 flex items-baseline justify-between">
+          <h1 className="text-lg font-bold">Laporan Inventaris</h1>
+          <p className="text-xs text-gray-600">Dicetak: {printedAt}</p>
+        </div>
+        {filterSummary && (
+          <p className="mt-1 text-xs italic text-gray-600">
+            Filter aktif — {filterSummary}
+          </p>
+        )}
+      </div>
+
+      {/* Header (screen) */}
+      <div className="mb-4 flex flex-col gap-4 no-print sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Laporan Inventaris</h1>
           <p className="text-sm text-gray-500">

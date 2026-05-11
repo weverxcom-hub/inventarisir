@@ -265,7 +265,8 @@ function HandoverFormModal({
     giverName.trim() &&
     receiverName.trim() &&
     finalUnit &&
-    selected.size > 0;
+    selected.size > 0 &&
+    nomorSurat.trim().length > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -299,22 +300,21 @@ function HandoverFormModal({
         >
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Nomor Surat{" "}
-              <span className="text-xs font-normal text-gray-400">
-                (opsional — isi kalau pakai format penomoran sendiri)
-              </span>
+              Nomor Surat <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={nomorSurat}
               onChange={(e) => setNomorSurat(e.target.value)}
-              placeholder="contoh: 001/BAST/UNIGA/V/2026"
+              placeholder="02/UNIGA/BERITA-ACARA/V/2026"
               maxLength={120}
+              required
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
             <p className="mt-1 text-xs text-gray-500">
-              Kalau dikosongkan, sistem otomatis pakai ID internal
-              <span className="font-mono"> BAST-UGMALANG-...</span> sebagai nomor.
+              Pakai format penomoran resmi kampus (mis.
+              <span className="font-mono"> 02/UNIGA/BERITA-ACARA/V/2026</span>).
+              Wajib diisi.
             </p>
           </div>
 
