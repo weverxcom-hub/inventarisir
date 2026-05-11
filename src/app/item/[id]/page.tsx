@@ -120,7 +120,17 @@ export default function ItemDetailPage() {
             Kembali
           </Link>
           <button
-            onClick={() => window.print()}
+            onClick={() => {
+              // Scope the label-only print CSS so it doesn't blank
+              // BAST or Laporan when those pages call window.print().
+              document.body.classList.add("label-print-only");
+              const cleanup = () => {
+                document.body.classList.remove("label-print-only");
+                window.removeEventListener("afterprint", cleanup);
+              };
+              window.addEventListener("afterprint", cleanup);
+              window.print();
+            }}
             className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
           >
             <Printer size={16} />
