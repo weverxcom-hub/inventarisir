@@ -20,6 +20,7 @@ import Link from "next/link";
 import type { InventoryItem } from "@/types";
 import Logo from "@/components/Logo";
 import Footer from "@/components/Footer";
+import { toPreviewUrl } from "@/lib/drive";
 
 export default function ItemDetailPage() {
   const params = useParams();
@@ -245,19 +246,6 @@ function DetailRow({
       </div>
     </div>
   );
-}
-
-/**
- * Convert a Google Drive `webViewLink` (https://drive.google.com/file/d/{id}/view)
- * into an inline-renderable thumbnail URL. For non-Drive URLs, return as-is.
- */
-function toPreviewUrl(url: string): string {
-  if (!url) return "";
-  const driveMatch = url.match(/\/file\/d\/([^/]+)/);
-  if (driveMatch) {
-    return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`;
-  }
-  return url;
 }
 
 function AssetCard({

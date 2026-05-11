@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import Footer from "@/components/Footer";
+import { toPreviewUrl } from "@/lib/drive";
 
 interface HandoverItem {
   item_id: string;
@@ -143,7 +144,7 @@ export default function HandoverPrintPage() {
           // pixel-perfect regardless of how it was designed.
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={letterheadUrl}
+            src={toPreviewUrl(letterheadUrl, 1600)}
             alt="Kop Surat"
             className="mb-6 block w-full border-b-4 border-double border-gray-800 pb-3"
           />
