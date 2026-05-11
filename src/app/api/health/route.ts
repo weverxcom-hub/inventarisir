@@ -53,6 +53,7 @@ export const GET = async (req: NextRequest) => {
         accessible: boolean;
         folder_name?: string;
         error?: string;
+        via?: string;
       }
     | undefined;
 
@@ -60,8 +61,14 @@ export const GET = async (req: NextRequest) => {
   if (wantDrive && envOk) {
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || null;
     if (folderId) {
+      const drive = getDrive();
+      // Two-stage check: try `files.get` first, fall back to `files.list`
+      // because some Shared Drive (Drive bersama) configurations let a
+      // service-account member list/write inside a folder but reject
+      // `files.get` on the folder ID itself. The list-based probe matches
+      // what the real upload path needs (`files.create` with the folder as
+      // parent), so an accessible:true result here means uploads will work.
       try {
-        const drive = getDrive();
         const meta = await drive.files.get({
           fileId: folderId,
           fields: "id, name, mimeType",
@@ -72,14 +79,33 @@ export const GET = async (req: NextRequest) => {
           accessible: true,
           folder_name: meta.data.name || undefined,
         };
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Unknown Drive error";
-        driveCheck = {
-          folder_id: folderId,
-          accessible: false,
-          error: message,
-        };
+      } catch (getErr) {
+        try {
+          await drive.files.list({
+            q: `'${folderId}' in parents and trashed = false`,
+            fields: "files(id)",
+            pageSize: 1,
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true,
+          });
+          driveCheck = {
+            folder_id: folderId,
+            accessible: true,
+            via: "list_fallback",
+          };
+        } catch (listErr) {
+          const message =
+            listErr instanceof Error
+              ? listErr.message
+              : getErr instanceof Error
+                ? getErr.message
+                : "Unknown Drive error";
+          driveCheck = {
+            folder_id: folderId,
+            accessible: false,
+            error: message,
+          };
+        }
       }
     } else {
       driveCheck = { folder_id: null, accessible: false };
