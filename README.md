@@ -9,7 +9,7 @@ Menggunakan Google Sheets sebagai database dan Google Drive untuk penyimpanan fi
 - **Auth**: NextAuth.js (Credentials Provider, JWT strategy)
 - **Database**: Google Sheets API v4
 - **Storage**: Google Drive API v3
-- **QR Code**: qrcode + qrcode.react
+- **QR Code**: qrcode.react (dirender di client)
 
 ## Fitur
 
