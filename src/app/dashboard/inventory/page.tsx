@@ -3,16 +3,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import {
-  Plus,
-  Search,
-  Pencil,
-  Trash2,
-  Eye,
-  Loader2,
-  X,
-} from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, Loader2 } from "lucide-react";
 import type { InventoryItem, ItemCondition } from "@/types";
+import { apiFetch } from "@/lib/api-client";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorBanner from "@/components/ErrorBanner";
+import Modal from "@/components/Modal";
+import { FormField, TextInput, SelectInput } from "@/components/FormField";
+import { ConditionBadge } from "@/components/Badge";
 
 export default function InventoryPage() {
   const { data: session } = useSession();
@@ -21,6 +19,7 @@ export default function InventoryPage() {
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
@@ -29,12 +28,12 @@ export default function InventoryPage() {
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
-      const res = await fetch("/api/inventory");
-      const data = await res.json();
+      const data = await apiFetch<{ items: InventoryItem[] }>("/api/inventory");
       setItems(data.items || []);
-    } catch {
-      // handle error
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal memuat inventaris");
     } finally {
       setLoading(false);
     }
@@ -54,9 +53,12 @@ export default function InventoryPage() {
   const handleDelete = async (itemId: string) => {
     if (!confirm("Hapus item ini?")) return;
     setDeleting(itemId);
+    setError("");
     try {
-      await fetch(`/api/inventory?item_id=${itemId}`, { method: "DELETE" });
+      await apiFetch(`/api/inventory?item_id=${itemId}`, { method: "DELETE" });
       await fetchItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal menghapus item");
     } finally {
       setDeleting(null);
     }
@@ -70,15 +72,16 @@ export default function InventoryPage() {
     condition: ItemCondition;
   }) => {
     setSaving(true);
+    setError("");
     try {
       if (editItem) {
-        await fetch("/api/inventory", {
+        await apiFetch("/api/inventory", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ item_id: editItem.item_id, ...formData }),
         });
       } else {
-        await fetch("/api/inventory", {
+        await apiFetch("/api/inventory", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
@@ -87,20 +90,15 @@ export default function InventoryPage() {
       setShowForm(false);
       setEditItem(null);
       await fetchItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal menyimpan item");
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat inventaris...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner fullPage text="Memuat inventaris..." />;
   }
 
   return (
@@ -135,6 +133,8 @@ export default function InventoryPage() {
           )}
         </div>
       </div>
+
+      {error && <ErrorBanner message={error} />}
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -258,131 +258,80 @@ function ItemFormModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
-            {item ? "Edit Item" : "Tambah Item Baru"}
-          </h2>
-          <button onClick={onClose} className="rounded p-1 hover:bg-gray-100">
-            <X size={20} />
-          </button>
-        </div>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit({ name, category, quantity, location, condition });
-          }}
-          className="space-y-4"
-        >
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Nama Item
-            </label>
-            <input
+    <Modal title={item ? "Edit Item" : "Tambah Item Baru"} onClose={onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit({ name, category, quantity, location, condition });
+        }}
+        className="space-y-4"
+      >
+        <FormField label="Nama Item">
+          <TextInput
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </FormField>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Kategori">
+            <TextInput
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
               required
             />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Kategori
-              </label>
-              <input
-                type="text"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Jumlah
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                required
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Lokasi
-              </label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Kondisi
-              </label>
-              <select
-                value={condition}
-                onChange={(e) =>
-                  setCondition(e.target.value as ItemCondition)
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                <option value="Good">Baik</option>
-                <option value="Repair">Perlu Perbaikan</option>
-                <option value="Broken">Rusak</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          </FormField>
+          <FormField label="Jumlah">
+            <TextInput
+              type="number"
+              min={1}
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              required
+            />
+          </FormField>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Lokasi">
+            <TextInput
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              required
+            />
+          </FormField>
+          <FormField label="Kondisi">
+            <SelectInput
+              value={condition}
+              onChange={(e) => setCondition(e.target.value as ItemCondition)}
             >
-              Batal
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
-            >
-              {saving && <Loader2 size={14} className="animate-spin" />}
-              {item ? "Simpan" : "Tambah"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+              <option value="Good">Baik</option>
+              <option value="Repair">Perlu Perbaikan</option>
+              <option value="Broken">Rusak</option>
+            </SelectInput>
+          </FormField>
+        </div>
 
-function ConditionBadge({ condition }: { condition: string }) {
-  const styles: Record<string, string> = {
-    Good: "bg-green-100 text-green-700",
-    Repair: "bg-yellow-100 text-yellow-700",
-    Broken: "bg-red-100 text-red-700",
-  };
-
-  return (
-    <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-        styles[condition] || "bg-gray-100 text-gray-700"
-      }`}
-    >
-      {condition}
-    </span>
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            {item ? "Simpan" : "Tambah"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

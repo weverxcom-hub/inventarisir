@@ -2,14 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import {
-  Plus,
-  Loader2,
-  X,
-  Upload,
-  ExternalLink,
-} from "lucide-react";
-import type { ProcurementRequest, ProcurementStatus } from "@/types";
+import { Plus, Loader2, Upload, ExternalLink } from "lucide-react";
+import type { ProcurementRequest } from "@/types";
+import { apiFetch } from "@/lib/api-client";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorBanner from "@/components/ErrorBanner";
+import Modal from "@/components/Modal";
+import { FormField, TextInput } from "@/components/FormField";
+import { StatusBadge } from "@/components/Badge";
 
 export default function ProcurementPage() {
   const { data: session } = useSession();
@@ -18,18 +18,21 @@ export default function ProcurementPage() {
 
   const [requests, setRequests] = useState<ProcurementRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState<string | null>(null);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
-      const res = await fetch("/api/procurement");
-      const data = await res.json();
+      const data = await apiFetch<{ requests: ProcurementRequest[] }>(
+        "/api/procurement"
+      );
       setRequests(data.requests || []);
-    } catch {
-      // handle error
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal memuat pengadaan");
     } finally {
       setLoading(false);
     }
@@ -43,13 +46,18 @@ export default function ProcurementPage() {
     if (!confirm("Selesaikan pengadaan ini dan tambahkan ke inventaris?"))
       return;
     setCompleting(requestId);
+    setError("");
     try {
-      await fetch("/api/procurement", {
+      await apiFetch("/api/procurement", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ request_id: requestId, action: "complete" }),
       });
       await fetchRequests();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Gagal menyelesaikan pengadaan"
+      );
     } finally {
       setCompleting(null);
     }
@@ -62,28 +70,24 @@ export default function ProcurementPage() {
     nota_photo_drive_id: string;
   }) => {
     setSaving(true);
+    setError("");
     try {
-      await fetch("/api/procurement", {
+      await apiFetch("/api/procurement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
       setShowForm(false);
       await fetchRequests();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal mengajukan pengadaan");
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat pengadaan...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner fullPage text="Memuat pengadaan..." />;
   }
 
   return (
@@ -103,6 +107,8 @@ export default function ProcurementPage() {
           Ajukan Pengadaan
         </button>
       </div>
+
+      {error && <ErrorBanner message={error} />}
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
@@ -136,7 +142,7 @@ export default function ProcurementPage() {
                 <td className="px-4 py-3">
                   {req.nota_photo_drive_id ? (
                     <a
-                      href={`https://drive.google.com/file/d/${req.nota_photo_drive_id}/view`}
+                      href={`/api/drive-file/${req.nota_photo_drive_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
@@ -210,159 +216,122 @@ function ProcurementFormModal({
   const [estimatedPrice, setEstimatedPrice] = useState(0);
   const [notaFileId, setNotaFileId] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploading(true);
+    setUploadError("");
     try {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("/api/upload", {
+      const data = await apiFetch<{ fileId?: string }>("/api/upload", {
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
       if (data.fileId) {
         setNotaFileId(data.fileId);
       }
-    } catch {
-      alert("Gagal mengupload file");
+    } catch (err) {
+      setUploadError(
+        err instanceof Error ? err.message : "Gagal mengupload file"
+      );
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Ajukan Pengadaan Baru</h2>
-          <button onClick={onClose} className="rounded p-1 hover:bg-gray-100">
-            <X size={20} />
-          </button>
-        </div>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit({
-              item_name: itemName,
-              quantity,
-              estimated_price: estimatedPrice,
-              nota_photo_drive_id: notaFileId,
-            });
-          }}
-          className="space-y-4"
-        >
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Nama Barang
-            </label>
-            <input
-              type="text"
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+    <Modal title="Ajukan Pengadaan Baru" onClose={onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit({
+            item_name: itemName,
+            quantity,
+            estimated_price: estimatedPrice,
+            nota_photo_drive_id: notaFileId,
+          });
+        }}
+        className="space-y-4"
+      >
+        <FormField label="Nama Barang">
+          <TextInput
+            type="text"
+            value={itemName}
+            onChange={(e) => setItemName(e.target.value)}
+            required
+          />
+        </FormField>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Jumlah">
+            <TextInput
+              type="number"
+              min={1}
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
               required
             />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Jumlah
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Estimasi Harga (Rp)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={estimatedPrice}
-                onChange={(e) => setEstimatedPrice(Number(e.target.value))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                required
-              />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Foto Nota (Opsional)
-            </label>
-            <div className="flex items-center gap-3">
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
-                {uploading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Upload size={16} />
-                )}
-                {uploading ? "Mengupload..." : "Pilih File"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                  disabled={uploading}
-                />
-              </label>
-              {notaFileId && (
-                <span className="text-xs text-green-600">
-                  File berhasil diupload
-                </span>
+          </FormField>
+          <FormField label="Estimasi Harga (Rp)">
+            <TextInput
+              type="number"
+              min={0}
+              value={estimatedPrice}
+              onChange={(e) => setEstimatedPrice(Number(e.target.value))}
+              required
+            />
+          </FormField>
+        </div>
+        <FormField label="Foto Nota (Opsional)">
+          <div className="flex items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
+              {uploading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Upload size={16} />
               )}
-            </div>
+              {uploading ? "Mengupload..." : "Pilih File"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
+            </label>
+            {notaFileId && (
+              <span className="text-xs text-green-600">
+                File berhasil diupload
+              </span>
+            )}
           </div>
+          {uploadError && (
+            <p className="mt-1.5 text-xs text-red-600">{uploadError}</p>
+          )}
+        </FormField>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
-            >
-              {saving && <Loader2 size={14} className="animate-spin" />}
-              Ajukan
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: ProcurementStatus | string }) {
-  const styles: Record<string, string> = {
-    Pending: "bg-yellow-100 text-yellow-700",
-    Approved: "bg-blue-100 text-blue-700",
-    Rejected: "bg-red-100 text-red-700",
-    Completed: "bg-green-100 text-green-700",
-  };
-
-  return (
-    <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-        styles[status] || "bg-gray-100 text-gray-700"
-      }`}
-    >
-      {status}
-    </span>
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            Ajukan
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

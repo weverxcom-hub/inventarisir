@@ -52,8 +52,8 @@ Menggunakan Google Sheets sebagai database dan Google Drive untuk penyimpanan fi
 |---------|------|----------|----------|----------|-----------|-----------|-------------|--------|------------|
 
 **Sheet: Procurement**
-| Request_ID | Requestor_Name | Item_Name | Quantity | Estimated_Price | Status | Nota_Photo_Drive_ID | Created_At |
-|------------|----------------|-----------|----------|-----------------|--------|---------------------|------------|
+| Request_ID | Requestor_Name | Item_Name | Quantity | Estimated_Price | Status | Nota_Photo_Drive_ID | Created_At | Updated_By | Updated_At |
+|------------|----------------|-----------|----------|-----------------|--------|---------------------|------------|------------|------------|
 
 3. Share spreadsheet dengan `client_email` Service Account (Editor)
 4. Catat Spreadsheet ID dari URL
@@ -82,13 +82,17 @@ GOOGLE_DRIVE_FOLDER_ID=<ID folder Drive>
 
 ### 5. Buat User Admin Pertama
 
-Karena belum ada user, tambahkan baris pertama di sheet **Users** secara manual:
+Karena belum ada user, tambahkan baris pertama di sheet **Users** secara manual. Generate hash password **secara lokal** — jangan pernah mengetik password asli ke situs generator bcrypt pihak ketiga:
+
+```bash
+node -e "console.log(require('bcryptjs').hashSync('password-anda', 10))"
+```
 
 1. Buka Google Spreadsheet
 2. Di sheet **Users**, isi baris pertama:
    - Name: `Admin`
    - Email: `admin@unigamalang.ac.id`
-   - Password: *(hash bcrypt, generate di https://bcrypt-generator.com/)*
+   - Password: *(tempel hash hasil perintah di atas)*
    - Role: `Admin`
 
 ### 6. Jalankan Aplikasi

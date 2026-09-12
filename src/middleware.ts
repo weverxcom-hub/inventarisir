@@ -1,6 +1,5 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
 const authMiddleware = withAuth(
   function middleware(req) {
@@ -19,18 +18,15 @@ const authMiddleware = withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      // Skip the auth check entirely for the SSO callback route, since it
+      // sets its own session cookie before a NextAuth token exists yet.
+      authorized: ({ req, token }) =>
+        req.nextUrl.pathname.startsWith("/auth/") || !!token,
     },
   }
 );
 
-export default function middleware(req: NextRequest) {
-  // Allow SSO callback route through without auth check
-  if (req.nextUrl.pathname.startsWith("/auth/")) {
-    return NextResponse.next();
-  }
-  return (authMiddleware as unknown as (req: NextRequest) => Promise<NextResponse>)(req);
-}
+export default authMiddleware;
 
 export const config = {
   matcher: ["/dashboard/:path*", "/auth/:path*"],

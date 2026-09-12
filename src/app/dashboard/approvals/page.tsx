@@ -1,27 +1,29 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import {
-  CheckCircle,
-  XCircle,
-  Loader2,
-  ExternalLink,
-} from "lucide-react";
+import { CheckCircle, XCircle, Loader2, ExternalLink } from "lucide-react";
 import type { ProcurementRequest } from "@/types";
+import { apiFetch } from "@/lib/api-client";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorBanner from "@/components/ErrorBanner";
+import { StatusBadge } from "@/components/Badge";
 
 export default function ApprovalsPage() {
   const [requests, setRequests] = useState<ProcurementRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [acting, setActing] = useState<string | null>(null);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
-      const res = await fetch("/api/procurement");
-      const data = await res.json();
+      const data = await apiFetch<{ requests: ProcurementRequest[] }>(
+        "/api/procurement"
+      );
       setRequests(data.requests || []);
-    } catch {
-      // handle error
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal memuat persetujuan");
     } finally {
       setLoading(false);
     }
@@ -31,15 +33,23 @@ export default function ApprovalsPage() {
     fetchRequests();
   }, [fetchRequests]);
 
-  const handleAction = async (requestId: string, status: "Approved" | "Rejected") => {
+  const handleAction = async (
+    requestId: string,
+    status: "Approved" | "Rejected"
+  ) => {
     setActing(requestId);
+    setError("");
     try {
-      await fetch("/api/procurement", {
+      await apiFetch("/api/procurement", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ request_id: requestId, status }),
       });
       await fetchRequests();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Gagal memproses persetujuan"
+      );
     } finally {
       setActing(null);
     }
@@ -49,14 +59,7 @@ export default function ApprovalsPage() {
   const processed = requests.filter((r) => r.status !== "Pending");
 
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat persetujuan...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner fullPage text="Memuat persetujuan..." />;
   }
 
   return (
@@ -67,6 +70,8 @@ export default function ApprovalsPage() {
           {pending.length} permintaan menunggu persetujuan
         </p>
       </div>
+
+      {error && <ErrorBanner message={error} />}
 
       {/* Pending Requests */}
       {pending.length > 0 && (
@@ -101,7 +106,7 @@ export default function ApprovalsPage() {
                       </span>
                       {req.nota_photo_drive_id && (
                         <a
-                          href={`https://drive.google.com/file/d/${req.nota_photo_drive_id}/view`}
+                          href={`/api/drive-file/${req.nota_photo_drive_id}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-blue-600 hover:underline"
@@ -168,6 +173,8 @@ export default function ApprovalsPage() {
                   <th className="px-4 py-3">Nama Barang</th>
                   <th className="px-4 py-3">Pemohon</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Diproses Oleh</th>
+                  <th className="px-4 py-3">Pada</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -183,6 +190,14 @@ export default function ApprovalsPage() {
                     <td className="px-4 py-3">
                       <StatusBadge status={req.status} />
                     </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {req.updated_by || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {req.updated_at
+                        ? new Date(req.updated_at).toLocaleString("id-ID")
+                        : "-"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -191,23 +206,5 @@ export default function ApprovalsPage() {
         </div>
       )}
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    Approved: "bg-blue-100 text-blue-700",
-    Rejected: "bg-red-100 text-red-700",
-    Completed: "bg-green-100 text-green-700",
-  };
-
-  return (
-    <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-        styles[status] || "bg-gray-100 text-gray-700"
-      }`}
-    >
-      {status}
-    </span>
   );
 }

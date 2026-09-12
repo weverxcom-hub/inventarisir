@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getSheetData,
-  appendRow,
   updateRow,
-  generateRequestId,
-  generateItemId,
+  createProcurementRow,
+  createInventoryRow,
 } from "@/lib/google";
 import { requireAuth, requireRole } from "@/lib/session";
-import QRCode from "qrcode";
 
 export async function GET() {
   try {
@@ -25,6 +23,8 @@ export async function GET() {
       status: row[5] || "Pending",
       nota_photo_drive_id: row[6] || "",
       created_at: row[7] || "",
+      updated_by: row[8] || "",
+      updated_at: row[9] || "",
     }));
 
     return NextResponse.json({ requests });
@@ -43,11 +43,25 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { item_name, quantity, estimated_price, nota_photo_drive_id } = body;
 
-    const requestId = await generateRequestId();
+    if (!item_name) {
+      return NextResponse.json({ error: "item_name is required" }, { status: 400 });
+    }
+    if (typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1) {
+      return NextResponse.json(
+        { error: "Quantity must be a positive whole number" },
+        { status: 400 }
+      );
+    }
+    if (typeof estimated_price !== "number" || estimated_price < 0) {
+      return NextResponse.json(
+        { error: "Estimated price must be a non-negative number" },
+        { status: 400 }
+      );
+    }
+
     const now = new Date().toISOString();
 
-    await appendRow("Procurement", [
-      requestId,
+    const requestId = await createProcurementRow([
       session.user.name || session.user.email || "Unknown",
       item_name,
       String(quantity),
@@ -55,6 +69,8 @@ export async function POST(req: NextRequest) {
       "Pending",
       nota_photo_drive_id || "",
       now,
+      "",
+      "",
     ]);
 
     return NextResponse.json({ success: true, request_id: requestId });
@@ -86,9 +102,11 @@ export async function PUT(req: NextRequest) {
 
     // Approve/Reject action (Approver or Admin)
     if (status === "Approved" || status === "Rejected") {
-      await requireRole(["Approver", "Admin"]);
+      const approver = await requireRole(["Approver", "Admin"]);
 
       existing[5] = status;
+      existing[8] = approver.user.email || "";
+      existing[9] = new Date().toISOString();
       await updateRow("Procurement", rowIndex + 1, existing);
 
       return NextResponse.json({ success: true });
@@ -96,23 +114,17 @@ export async function PUT(req: NextRequest) {
 
     // Complete action — Admin converts to inventory item
     if (action === "complete") {
-      await requireRole(["Admin"]);
+      const admin = await requireRole(["Admin"]);
 
       existing[5] = "Completed";
+      existing[8] = admin.user.email || "";
+      existing[9] = new Date().toISOString();
       await updateRow("Procurement", rowIndex + 1, existing);
 
       // Auto-add to inventory
-      const itemId = await generateItemId();
-      const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-      const itemUrl = `${appUrl}/item/${itemId}`;
-      const qrDataUrl = await QRCode.toDataURL(itemUrl, {
-        width: 300,
-        margin: 1,
-      });
       const now = new Date().toISOString();
 
-      await appendRow("Inventory", [
-        itemId,
+      const itemId = await createInventoryRow([
         existing[2], // item_name
         "Umum", // default category
         existing[3], // quantity
@@ -120,7 +132,7 @@ export async function PUT(req: NextRequest) {
         "Good",
         "",
         "",
-        qrDataUrl,
+        "",
         now,
       ]);
 

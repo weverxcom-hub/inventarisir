@@ -37,4 +37,6 @@ export interface ProcurementRequest {
   status: ProcurementStatus;
   nota_photo_drive_id: string;
   created_at: string;
+  updated_by: string;
+  updated_at: string;
 }

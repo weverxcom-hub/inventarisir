@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Loader2,
-  X,
-} from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import type { UserRole } from "@/types";
+import { apiFetch } from "@/lib/api-client";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorBanner from "@/components/ErrorBanner";
+import Modal from "@/components/Modal";
+import { FormField, TextInput, SelectInput } from "@/components/FormField";
+import { RoleBadge } from "@/components/Badge";
 
 interface UserData {
   name: string;
@@ -17,21 +19,32 @@ interface UserData {
 }
 
 export default function UsersPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const isAdmin = session?.user?.role === "Admin";
+
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState<UserData | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (status === "authenticated" && !isAdmin) {
+      router.replace("/dashboard");
+    }
+  }, [status, isAdmin, router]);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
-      const res = await fetch("/api/users");
-      const data = await res.json();
+      const data = await apiFetch<{ users: UserData[] }>("/api/users");
       setUsers(data.users || []);
-    } catch {
-      // handle error
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal memuat pengguna");
     } finally {
       setLoading(false);
     }
@@ -44,11 +57,14 @@ export default function UsersPage() {
   const handleDelete = async (email: string) => {
     if (!confirm("Hapus pengguna ini?")) return;
     setDeleting(email);
+    setError("");
     try {
-      await fetch(`/api/users?email=${encodeURIComponent(email)}`, {
+      await apiFetch(`/api/users?email=${encodeURIComponent(email)}`, {
         method: "DELETE",
       });
       await fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal menghapus pengguna");
     } finally {
       setDeleting(null);
     }
@@ -61,6 +77,7 @@ export default function UsersPage() {
     role: UserRole;
   }) => {
     setSaving(true);
+    setError("");
     try {
       if (editUser) {
         const body: Record<string, string> = {
@@ -71,13 +88,13 @@ export default function UsersPage() {
         if (formData.password) {
           body.password = formData.password;
         }
-        await fetch("/api/users", {
+        await apiFetch("/api/users", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
       } else {
-        await fetch("/api/users", {
+        await apiFetch("/api/users", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
@@ -86,20 +103,15 @@ export default function UsersPage() {
       setShowForm(false);
       setEditUser(null);
       await fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal menyimpan pengguna");
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat pengguna...</p>
-        </div>
-      </div>
-    );
+  if (loading || status === "loading" || !isAdmin) {
+    return <LoadingSpinner fullPage text="Memuat pengguna..." />;
   }
 
   return (
@@ -107,7 +119,10 @@ export default function UsersPage() {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Kelola Pengguna</h1>
-          <p className="text-sm text-gray-500">{users.length} pengguna</p>
+          <p className="text-sm text-gray-500">
+            {users.length} pengguna &middot; perubahan role baru berlaku
+            setelah pengguna logout &amp; login kembali
+          </p>
         </div>
         <button
           onClick={() => {
@@ -120,6 +135,8 @@ export default function UsersPage() {
           Tambah Pengguna
         </button>
       </div>
+
+      {error && <ErrorBanner message={error} />}
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
@@ -218,113 +235,73 @@ function UserFormModal({
   const [role, setRole] = useState<UserRole>(user?.role || "Staff");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
-            {user ? "Edit Pengguna" : "Tambah Pengguna Baru"}
-          </h2>
-          <button onClick={onClose} className="rounded p-1 hover:bg-gray-100">
-            <X size={20} />
+    <Modal
+      title={user ? "Edit Pengguna" : "Tambah Pengguna Baru"}
+      onClose={onClose}
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit({ name, email, password, role });
+        }}
+        className="space-y-4"
+      >
+        <FormField label="Nama">
+          <TextInput
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </FormField>
+        <FormField label="Email">
+          <TextInput
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={!!user}
+            required
+          />
+        </FormField>
+        <FormField
+          label={`Password ${user ? "(kosongkan jika tidak ingin mengubah)" : ""}`}
+        >
+          <TextInput
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required={!user}
+          />
+        </FormField>
+        <FormField label="Role">
+          <SelectInput
+            value={role}
+            onChange={(e) => setRole(e.target.value as UserRole)}
+          >
+            <option value="Staff">Staff</option>
+            <option value="Approver">Approver</option>
+            <option value="Admin">Admin</option>
+          </SelectInput>
+        </FormField>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            {user ? "Simpan" : "Tambah"}
           </button>
         </div>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit({ name, email, password, role });
-          }}
-          className="space-y-4"
-        >
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Nama
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              required
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={!!user}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-100"
-              required
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Password {user && "(kosongkan jika tidak ingin mengubah)"}
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              required={!user}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Role
-            </label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            >
-              <option value="Staff">Staff</option>
-              <option value="Approver">Approver</option>
-              <option value="Admin">Admin</option>
-            </select>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
-            >
-              {saving && <Loader2 size={14} className="animate-spin" />}
-              {user ? "Simpan" : "Tambah"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function RoleBadge({ role }: { role: string }) {
-  const styles: Record<string, string> = {
-    Admin: "bg-purple-100 text-purple-700",
-    Approver: "bg-blue-100 text-blue-700",
-    Staff: "bg-gray-100 text-gray-700",
-  };
-
-  return (
-    <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-        styles[role] || "bg-gray-100 text-gray-700"
-      }`}
-    >
-      {role}
-    </span>
+      </form>
+    </Modal>
   );
 }

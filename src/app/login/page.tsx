@@ -1,16 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, LogIn } from "lucide-react";
 
+const SSO_ERROR_MESSAGES: Record<string, string> = {
+  sso_failed: "Gagal masuk dengan SSO. Coba lagi atau hubungi admin.",
+  sso_unregistered:
+    "Akun Anda belum terdaftar di sistem ini. Hubungi admin untuk didaftarkan terlebih dahulu.",
+};
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const ssoError = searchParams.get("error");
+    if (ssoError) {
+      setError(SSO_ERROR_MESSAGES[ssoError] || "Gagal masuk. Coba lagi.");
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

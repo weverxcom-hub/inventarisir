@@ -2,28 +2,32 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { Package, ShoppingCart, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { Package, ShoppingCart, CheckCircle, AlertTriangle } from "lucide-react";
 import type { InventoryItem, ProcurementRequest } from "@/types";
+import { apiFetch } from "@/lib/api-client";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorBanner from "@/components/ErrorBanner";
+import { ConditionBadge } from "@/components/Badge";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [procurement, setProcurement] = useState<ProcurementRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function fetchData() {
+      setError("");
       try {
-        const [invRes, procRes] = await Promise.all([
-          fetch("/api/inventory"),
-          fetch("/api/procurement"),
+        const [invData, procData] = await Promise.all([
+          apiFetch<{ items: InventoryItem[] }>("/api/inventory"),
+          apiFetch<{ requests: ProcurementRequest[] }>("/api/procurement"),
         ]);
-        const invData = await invRes.json();
-        const procData = await procRes.json();
         setInventory(invData.items || []);
         setProcurement(procData.requests || []);
-      } catch {
-        // silently handle
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat dashboard");
       } finally {
         setLoading(false);
       }
@@ -37,14 +41,7 @@ export default function DashboardPage() {
   const pendingRequests = procurement.filter((p) => p.status === "Pending").length;
 
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat dashboard...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner fullPage text="Memuat dashboard..." />;
   }
 
   return (
@@ -55,6 +52,8 @@ export default function DashboardPage() {
           Selamat datang, {session?.user?.name || "User"}
         </p>
       </div>
+
+      {error && <ErrorBanner message={error} />}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -160,23 +159,5 @@ function StatCard({
         </div>
       </div>
     </div>
-  );
-}
-
-function ConditionBadge({ condition }: { condition: string }) {
-  const styles: Record<string, string> = {
-    Good: "bg-green-100 text-green-700",
-    Repair: "bg-yellow-100 text-yellow-700",
-    Broken: "bg-red-100 text-red-700",
-  };
-
-  return (
-    <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-        styles[condition] || "bg-gray-100 text-gray-700"
-      }`}
-    >
-      {condition}
-    </span>
   );
 }

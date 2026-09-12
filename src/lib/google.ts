@@ -104,7 +104,7 @@ export async function uploadFileToDrive(
   fileName: string,
   mimeType: string,
   buffer: Buffer
-): Promise<{ fileId: string; webViewLink: string }> {
+): Promise<{ fileId: string }> {
   const drive = getDrive();
 
   const fileMetadata = {
@@ -120,34 +120,51 @@ export async function uploadFileToDrive(
   const res = await drive.files.create({
     requestBody: fileMetadata,
     media,
-    fields: "id, webViewLink",
+    fields: "id",
   });
 
-  // Make file publicly viewable
-  await drive.permissions.create({
-    fileId: res.data.id!,
-    requestBody: {
-      role: "reader",
-      type: "anyone",
-    },
-  });
+  // Deliberately not shared publicly — only the service account can read it.
+  // Authenticated users view it through the app's own proxy route
+  // (GET /api/drive-file/[id]), which enforces requireAuth() itself.
+  return { fileId: res.data.id || "" };
+}
 
-  return {
-    fileId: res.data.id || "",
-    webViewLink: res.data.webViewLink || "",
-  };
+export async function getDriveFile(
+  fileId: string
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  const drive = getDrive();
+
+  const meta = await drive.files.get({ fileId, fields: "mimeType" });
+  const mimeType = meta.data.mimeType || "application/octet-stream";
+
+  const media = await drive.files.get(
+    { fileId, alt: "media" },
+    { responseType: "arraybuffer" }
+  );
+
+  return { buffer: Buffer.from(media.data as ArrayBuffer), mimeType };
 }
 
 // ─── ID Generation ───────────────────────────────────────────────
 
-export async function generateItemId(): Promise<string> {
-  const year = new Date().getFullYear();
-  const data = await getSheetData("Inventory");
-  const rows = data.slice(1); // skip header
+// Sequential IDs are computed by scanning the sheet for the current max,
+// which races if two requests overlap. Serializing per key on this process
+// closes that window for a single-instance deployment (it does not help
+// across multiple concurrently-running server instances).
+const idLocks = new Map<string, Promise<unknown>>();
 
-  const yearPrefix = `UGMALANG-INV-${year}-`;
+async function withIdLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const previous = idLocks.get(key) ?? Promise.resolve();
+  const current = previous.then(fn, fn);
+  idLocks.set(
+    key,
+    current.catch(() => {})
+  );
+  return current;
+}
+
+function nextSequentialId(rows: string[][], yearPrefix: string): string {
   let maxNum = 0;
-
   for (const row of rows) {
     const id = row[0] || "";
     if (id.startsWith(yearPrefix)) {
@@ -155,27 +172,37 @@ export async function generateItemId(): Promise<string> {
       if (numPart > maxNum) maxNum = numPart;
     }
   }
-
   const nextNum = String(maxNum + 1).padStart(3, "0");
   return `${yearPrefix}${nextNum}`;
 }
 
-export async function generateRequestId(): Promise<string> {
-  const year = new Date().getFullYear();
-  const data = await getSheetData("Procurement");
-  const rows = data.slice(1);
+// Appends a new Inventory row with a freshly-computed sequential item_id.
+// The read-max-then-write has to happen inside the lock, not just the ID
+// computation — otherwise two overlapping calls can both compute the same
+// "next" number before either one's row is visible to the other.
+export async function createInventoryRow(
+  restOfRow: string[]
+): Promise<string> {
+  return withIdLock("inventory", async () => {
+    const year = new Date().getFullYear();
+    const data = await getSheetData("Inventory");
+    const itemId = nextSequentialId(
+      data.slice(1),
+      `UGMALANG-INV-${year}-`
+    );
+    await appendRow("Inventory", [itemId, ...restOfRow]);
+    return itemId;
+  });
+}
 
-  const yearPrefix = `REQ-${year}-`;
-  let maxNum = 0;
-
-  for (const row of rows) {
-    const id = row[0] || "";
-    if (id.startsWith(yearPrefix)) {
-      const numPart = parseInt(id.replace(yearPrefix, ""), 10);
-      if (numPart > maxNum) maxNum = numPart;
-    }
-  }
-
-  const nextNum = String(maxNum + 1).padStart(3, "0");
-  return `${yearPrefix}${nextNum}`;
+export async function createProcurementRow(
+  restOfRow: string[]
+): Promise<string> {
+  return withIdLock("procurement", async () => {
+    const year = new Date().getFullYear();
+    const data = await getSheetData("Procurement");
+    const requestId = nextSequentialId(data.slice(1), `REQ-${year}-`);
+    await appendRow("Procurement", [requestId, ...restOfRow]);
+    return requestId;
+  });
 }

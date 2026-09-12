@@ -2,6 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { getSheetData } from "./google";
+import { isRateLimited, recordFailedAttempt, clearAttempts } from "./rate-limit";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -14,19 +15,29 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
+        const key = credentials.email.toLowerCase();
+        if (isRateLimited(key)) return null;
+
         const data = await getSheetData("Users");
         const rows = data.slice(1); // skip header
 
         const userRow = rows.find((row) => row[1] === credentials.email);
-        if (!userRow) return null;
+        if (!userRow) {
+          recordFailedAttempt(key);
+          return null;
+        }
 
         const [name, email, hashedPassword, role] = userRow;
         const isValid = await bcrypt.compare(
           credentials.password,
           hashedPassword
         );
-        if (!isValid) return null;
+        if (!isValid) {
+          recordFailedAttempt(key);
+          return null;
+        }
 
+        clearAttempts(key);
         return {
           id: email,
           name,

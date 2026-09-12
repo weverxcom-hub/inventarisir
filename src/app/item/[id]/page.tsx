@@ -9,12 +9,14 @@ import {
   Hash,
   Calendar,
   Printer,
-  Loader2,
   Package,
   ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import type { InventoryItem } from "@/types";
+import { apiFetch } from "@/lib/api-client";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import { ConditionBadge } from "@/components/Badge";
 
 export default function ItemDetailPage() {
   const params = useParams();
@@ -26,15 +28,12 @@ export default function ItemDetailPage() {
   useEffect(() => {
     async function fetchItem() {
       try {
-        const res = await fetch(`/api/inventory/${itemId}`);
-        if (!res.ok) {
-          setError("Item tidak ditemukan");
-          return;
-        }
-        const data = await res.json();
+        const data = await apiFetch<{ item: InventoryItem }>(
+          `/api/inventory/${itemId}`
+        );
         setItem(data.item);
       } catch {
-        setError("Gagal memuat data item");
+        setError("Item tidak ditemukan");
       } finally {
         setLoading(false);
       }
@@ -45,10 +44,7 @@ export default function ItemDetailPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Memuat detail item...</p>
-        </div>
+        <LoadingSpinner text="Memuat detail item..." />
       </div>
     );
   }
@@ -76,14 +72,6 @@ export default function ItemDetailPage() {
   const itemUrl = typeof window !== "undefined"
     ? `${window.location.origin}/item/${item.item_id}`
     : "";
-
-  const conditionStyles: Record<string, { bg: string; text: string; label: string }> = {
-    Good: { bg: "bg-green-100", text: "text-green-700", label: "Baik" },
-    Repair: { bg: "bg-yellow-100", text: "text-yellow-700", label: "Perlu Perbaikan" },
-    Broken: { bg: "bg-red-100", text: "text-red-700", label: "Rusak" },
-  };
-
-  const cond = conditionStyles[item.condition] || conditionStyles.Good;
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
@@ -124,11 +112,7 @@ export default function ItemDetailPage() {
               <h1 className="mb-1 text-xl font-bold text-gray-800">
                 {item.name}
               </h1>
-              <span
-                className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${cond.bg} ${cond.text}`}
-              >
-                {cond.label}
-              </span>
+              <ConditionBadge condition={item.condition} />
 
               <div className="mt-4 space-y-3">
                 <DetailRow
