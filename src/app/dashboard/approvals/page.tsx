@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { CheckCircle, XCircle, Loader2, ExternalLink } from "lucide-react";
 import type { ProcurementRequest } from "@/types";
 import { apiFetch } from "@/lib/api-client";
@@ -9,10 +11,21 @@ import ErrorBanner from "@/components/ErrorBanner";
 import { StatusBadge } from "@/components/Badge";
 
 export default function ApprovalsPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const canApprove =
+    session?.user?.role === "Approver" || session?.user?.role === "Admin";
+
   const [requests, setRequests] = useState<ProcurementRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [acting, setActing] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (status === "authenticated" && !canApprove) {
+      router.replace("/dashboard");
+    }
+  }, [status, canApprove, router]);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -58,7 +71,7 @@ export default function ApprovalsPage() {
   const pending = requests.filter((r) => r.status === "Pending");
   const processed = requests.filter((r) => r.status !== "Pending");
 
-  if (loading) {
+  if (loading || status === "loading" || !canApprove) {
     return <LoadingSpinner fullPage text="Memuat persetujuan..." />;
   }
 
